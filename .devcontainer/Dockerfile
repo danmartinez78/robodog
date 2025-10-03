@@ -30,6 +30,16 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     python3-rosdep \
     python3-vcstool \
     python3-argcomplete \
+    python3-setuptools \
+    python3-dev \
+    libeigen3-dev \
+    libgtest-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install ROS2 packages separately to handle potential package availability issues
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ros-${ROS_DISTRO}-desktop-full \
+    ros-${ROS_DISTRO}-rmw-cyclonedds-cpp \
     ros-${ROS_DISTRO}-navigation2 \
     ros-${ROS_DISTRO}-nav2-bringup \
     ros-${ROS_DISTRO}-joy \
@@ -39,9 +49,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ros-${ROS_DISTRO}-diagnostic-updater \
     ros-${ROS_DISTRO}-pcl-ros \
     ros-${ROS_DISTRO}-pcl-conversions \
+    ros-${ROS_DISTRO}-xacro \
+    ros-${ROS_DISTRO}-robot-state-publisher \
+    ros-${ROS_DISTRO}-joint-state-publisher \
+    ros-${ROS_DISTRO}-rviz2 \
+    ros-${ROS_DISTRO}-rqt \
     libpcl-dev \
-    libqhull-dev \
-    libqhull8.0 \
     && rm -rf /var/lib/apt/lists/*
 
 # Configure locale
@@ -56,11 +69,12 @@ RUN groupadd --gid ${USER_GID} ${USERNAME} \
     && chmod 0440 /etc/sudoers.d/${USERNAME}
 
 # Install Python tooling and utilities
-RUN pip3 install --no-cache-dir \
+RUN pip3 install --no-cache-dir --upgrade pip && \
+    pip3 install --no-cache-dir \
     numpy \
     scipy \
     matplotlib \
-    opencv-python \
+    opencv-python-headless \
     pillow \
     psutil \
     pandas \
@@ -68,24 +82,30 @@ RUN pip3 install --no-cache-dir \
     isort \
     flake8 \
     pylint \
-    pytest
+    pytest \
+    mypy \
+    pre-commit
 
 # Prepare rosdep
 RUN rosdep init || true
 
 # Set up workspace directory
-RUN mkdir -p /workspaces/go2_ros2_sdk
+RUN mkdir -p /workspaces/shadowhound
 
 # Bash defaults for the user
 RUN echo "source /opt/ros/${ROS_DISTRO}/setup.bash" >> /home/${USERNAME}/.bashrc && \
     echo "export ROS_DOMAIN_ID=42" >> /home/${USERNAME}/.bashrc && \
     echo "export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp" >> /home/${USERNAME}/.bashrc && \
-    echo "alias cb='colcon build'" >> /home/${USERNAME}/.bashrc && \
+    echo "export RCUTILS_LOGGING_BUFFERED_STREAM=1" >> /home/${USERNAME}/.bashrc && \
+    echo "export PYTHONPATH=\$PYTHONPATH:/opt/ros/${ROS_DISTRO}/lib/python3.10/site-packages" >> /home/${USERNAME}/.bashrc && \
+    echo "alias cb='colcon build --symlink-install'" >> /home/${USERNAME}/.bashrc && \
     echo "alias cbt='colcon test'" >> /home/${USERNAME}/.bashrc && \
-    echo "alias source-ws='[ -f install/setup.bash ] && source install/setup.bash'" >> /home/${USERNAME}/.bashrc
+    echo "alias cbr='colcon build --symlink-install && source install/setup.bash'" >> /home/${USERNAME}/.bashrc && \
+    echo "alias source-ws='[ -f install/setup.bash ] && source install/setup.bash'" >> /home/${USERNAME}/.bashrc && \
+    echo "alias rosdep-install='rosdep install --from-paths src --ignore-src -r -y'" >> /home/${USERNAME}/.bashrc
 
 USER ${USERNAME}
-WORKDIR /workspaces/go2_ros2_sdk
+WORKDIR /workspaces/shadowhound
 
 # Default shell
 SHELL ["/bin/bash", "-c"]

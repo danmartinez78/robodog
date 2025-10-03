@@ -1,0 +1,2 @@
+# This file tells colcon to ignore this directory during builds
+# Useful for log directories, documentation, etc.

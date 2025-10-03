@@ -1,26 +1,21 @@
 {
   "name": "Go2 ROS2 Humble",
-
   "build": {
     "dockerfile": "Dockerfile",
     "context": "..",
     "args": {
-  "ROS_DISTRO": "humble",
-  "VARIANT": "ros-core"
+      "ROS_DISTRO": "humble",
+      "VARIANT": "ros-core"
     }
   },
-
-  "workspaceFolder": "/workspaces/go2_ros2_sdk",
-
+  "workspaceFolder": "/workspaces/shadowhound",
   "remoteUser": "ros",
-
   "overrideCommand": false,
-
   "containerEnv": {
     "ROS_DOMAIN_ID": "42",
-    "RMW_IMPLEMENTATION": "rmw_cyclonedds_cpp"
+    "RMW_IMPLEMENTATION": "rmw_cyclonedds_cpp",
+    "RCUTILS_LOGGING_BUFFERED_STREAM": "1"
   },
-
   "customizations": {
     "vscode": {
       "settings": {
@@ -48,22 +43,35 @@
         "ms-vscode.cpptools-extension-pack",
         "streetsidesoftware.code-spell-checker",
         "eamodio.gitlens",
-        "ms-azuretools.vscode-docker"
+        "ms-azuretools.vscode-docker",
+        "redhat.vscode-xml",
+        "ms-python.mypy-type-checker",
+        "ms-vscode.vscode-json",
+        "github.copilot",
+        "github.copilot-chat"
       ]
     }
   },
-
   "features": {
     "ghcr.io/devcontainers/features/git:1": {},
-    "ghcr.io/devcontainers/features/github-cli:1": {}
+    "ghcr.io/devcontainers/features/github-cli:1": {},
+    "ghcr.io/devcontainers/features/common-utils:2": {
+      "installZsh": true,
+      "configureZshAsDefaultShell": false,
+      "installOhMyZsh": true,
+      "upgradePackages": true
+    }
   },
-
   "postCreateCommand": [
     "bash",
     "-lc",
-    "cd /workspaces/go2_ros2_sdk && bash .devcontainer/setup.sh"
+    "cd /workspaces/shadowhound && chmod +x .devcontainer/setup.sh && bash .devcontainer/setup.sh"
   ],
-
+  "postStartCommand": [
+    "bash",
+    "-c",
+    "source /opt/ros/humble/setup.bash"
+  ],
   "forwardPorts": [
     8080,
     9090,
