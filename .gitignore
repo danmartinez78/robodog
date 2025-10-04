@@ -6,14 +6,14 @@ install/
 log/
 
 # IDE and editor files
-.vscode/settings.json
-.vscode/launch.json
+.vscode/
 *.swp
 *.swo
 *~
 
 # Python
 __pycache__/
+.mypy_cache/
 *.py[cod]
 *$py.class
 *.so
