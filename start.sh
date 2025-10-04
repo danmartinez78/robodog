@@ -137,6 +137,12 @@ check_system() {
     
     local all_ok=true
     
+    # Source ROS2 if not already sourced
+    if [ -z "$ROS_DISTRO" ] && [ -f "/opt/ros/humble/setup.bash" ]; then
+        source /opt/ros/humble/setup.bash
+        print_info "Sourced ROS2 Humble environment"
+    fi
+    
     # Check ROS2
     if command -v ros2 &> /dev/null; then
         print_success "ROS2 installed"
@@ -144,6 +150,17 @@ check_system() {
         print_error "ROS2 not found"
         print_info "Install ROS2 Humble: https://docs.ros.org/en/humble/Installation.html"
         all_ok=false
+    fi
+    
+    # Check CycloneDDS if RMW_IMPLEMENTATION is set to it
+    if [ "${RMW_IMPLEMENTATION:-}" = "rmw_cyclonedds_cpp" ]; then
+        if dpkg -l | grep -q ros-humble-rmw-cyclonedds-cpp; then
+            print_success "CycloneDDS middleware installed"
+        else
+            print_error "CycloneDDS not installed but RMW_IMPLEMENTATION=$RMW_IMPLEMENTATION"
+            print_info "Install: sudo apt install ros-humble-rmw-cyclonedds-cpp"
+            all_ok=false
+        fi
     fi
     
     # Check Python
@@ -293,10 +310,15 @@ build_workspace() {
     
     # Check if already built
     if [ -d "install" ] && [ -f "install/setup.bash" ]; then
-        read -p "Workspace already built. Rebuild? [y/N]: " rebuild
-        if [[ "$rebuild" != "y" && "$rebuild" != "Y" ]]; then
-            print_info "Skipping build"
-            return 0
+        # Check if launch files are installed
+        if [ ! -f "install/shadowhound_mission_agent/share/shadowhound_mission_agent/launch/mission_agent.launch.py" ]; then
+            print_warning "Launch files not installed, rebuild required"
+        else
+            read -p "Workspace already built. Rebuild? [y/N]: " rebuild
+            if [[ "$rebuild" != "y" && "$rebuild" != "Y" ]]; then
+                print_info "Skipping build"
+                return 0
+            fi
         fi
     fi
     
@@ -324,6 +346,11 @@ build_workspace() {
 
 check_dependencies() {
     print_section "Checking Python Dependencies"
+    
+    # Source ROS2 if not already sourced
+    if [ -z "$ROS_DISTRO" ] && [ -f "/opt/ros/humble/setup.bash" ]; then
+        source /opt/ros/humble/setup.bash
+    fi
     
     # Source workspace
     if [ -f "install/setup.bash" ]; then
@@ -418,11 +445,16 @@ show_summary() {
 launch_system() {
     print_section "Launching ShadowHound"
     
+    # Source ROS2 first
+    if [ -f "/opt/ros/humble/setup.bash" ]; then
+        source /opt/ros/humble/setup.bash
+    fi
+    
     # Source workspace
     source install/setup.bash
     
     # Build launch command
-    local launch_cmd="ros2 launch shadowhound_mission_agent bringup.launch.py"
+    local launch_cmd="ros2 launch shadowhound_mission_agent mission_agent.launch.py"
     
     # Add parameters
     if [ -n "$MOCK_ROBOT" ]; then
