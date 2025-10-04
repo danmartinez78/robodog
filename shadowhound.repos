@@ -1,0 +1,5 @@
+repositories:
+  dimos-unitree:
+    type: git
+    url: https://github.com/danmartinez78/dimos-unitree.git
+    version: main
