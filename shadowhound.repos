@@ -2,4 +2,4 @@ repositories:
   dimos-unitree:
     type: git
     url: https://github.com/danmartinez78/dimos-unitree.git
-    version: main
+    version: 3b0122eec621d32f31d0c32e6565f4614e7de1f9  # Commit with go2_ros2_sdk robodan_dev submodule

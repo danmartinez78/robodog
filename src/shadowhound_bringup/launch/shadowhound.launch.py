@@ -9,43 +9,47 @@ from launch_ros.substitutions import FindPackageShare
 
 def generate_launch_description():
     """Generate launch description for complete ShadowHound system."""
-    
+
     # Declare launch arguments
     mock_robot_arg = DeclareLaunchArgument(
-        'mock_robot',
-        default_value='true',
-        description='Use mock robot connection (true/false)'
+        "mock_robot",
+        default_value="true",
+        description="Use mock robot connection (true/false)",
     )
-    
+
     agent_backend_arg = DeclareLaunchArgument(
-        'agent_backend',
-        default_value='cloud',
-        description='Agent backend: cloud (OpenAI) or local'
+        "agent_backend",
+        default_value="cloud",
+        description="Agent backend: cloud (OpenAI) or local",
     )
-    
+
     use_planning_arg = DeclareLaunchArgument(
-        'use_planning_agent',
-        default_value='false',
-        description='Use planning agent for multi-step missions'
+        "use_planning_agent",
+        default_value="false",
+        description="Use planning agent for multi-step missions",
     )
-    
+
     # Include mission agent launch
     mission_agent_launch = IncludeLaunchDescription(
-        PathJoinSubstitution([
-            FindPackageShare('shadowhound_mission_agent'),
-            'launch',
-            'mission_agent.launch.py'
-        ]),
+        PathJoinSubstitution(
+            [
+                FindPackageShare("shadowhound_mission_agent"),
+                "launch",
+                "mission_agent.launch.py",
+            ]
+        ),
         launch_arguments={
-            'mock_robot': LaunchConfiguration('mock_robot'),
-            'agent_backend': LaunchConfiguration('agent_backend'),
-            'use_planning_agent': LaunchConfiguration('use_planning_agent'),
-        }.items()
+            "mock_robot": LaunchConfiguration("mock_robot"),
+            "agent_backend": LaunchConfiguration("agent_backend"),
+            "use_planning_agent": LaunchConfiguration("use_planning_agent"),
+        }.items(),
     )
-    
-    return LaunchDescription([
-        mock_robot_arg,
-        agent_backend_arg,
-        use_planning_arg,
-        mission_agent_launch,
-    ])
+
+    return LaunchDescription(
+        [
+            mock_robot_arg,
+            agent_backend_arg,
+            use_planning_arg,
+            mission_agent_launch,
+        ]
+    )
