@@ -19,12 +19,14 @@ from pydantic import BaseModel
 
 class MissionCommand(BaseModel):
     """Mission command request model."""
+
     command: str
     priority: Optional[int] = 0
 
 
 class MissionResponse(BaseModel):
     """Mission command response model."""
+
     success: bool
     message: str
     command: str
@@ -32,32 +34,32 @@ class MissionResponse(BaseModel):
 
 class WebInterface:
     """Reusable web interface for robot mission control.
-    
+
     This class provides a FastAPI server that can be embedded in any ROS2 node.
     It handles HTTP requests and WebSocket connections for real-time updates.
-    
+
     Example:
         >>> # In your ROS node
         >>> def handle_command(cmd: str) -> dict:
         ...     # Your command processing logic
         ...     return {"success": True, "message": "Command executed"}
-        >>> 
+        >>>
         >>> web = WebInterface(
         ...     command_callback=handle_command,
         ...     port=8080
         ... )
         >>> web.start()
     """
-    
+
     def __init__(
         self,
         command_callback: Callable[[str], Dict[str, Any]],
         port: int = 8080,
         host: str = "0.0.0.0",
-        logger: Optional[logging.Logger] = None
+        logger: Optional[logging.Logger] = None,
     ):
         """Initialize web interface.
-        
+
         Args:
             command_callback: Function to call when mission command received.
                              Should accept (command: str) and return dict with
@@ -70,23 +72,23 @@ class WebInterface:
         self.port = port
         self.host = host
         self.logger = logger or logging.getLogger(__name__)
-        
+
         # WebSocket connections for real-time status updates
         self.active_connections: list[WebSocket] = []
-        
+
         # Server state
         self.server = None
         self.server_thread = None
         self.app = self._create_app()
-        
+
     def _create_app(self) -> FastAPI:
         """Create FastAPI application with routes."""
         app = FastAPI(
             title="ShadowHound Mission Control",
             description="Web interface for autonomous robot control",
-            version="0.1.0"
+            version="0.1.0",
         )
-        
+
         # Enable CORS for browser access
         app.add_middleware(
             CORSMiddleware,
@@ -95,46 +97,44 @@ class WebInterface:
             allow_methods=["*"],
             allow_headers=["*"],
         )
-        
+
         # Register routes
         @app.get("/", response_class=HTMLResponse)
         async def root():
             """Serve main dashboard."""
             return self._get_dashboard_html()
-        
+
         @app.get("/api/health")
         async def health():
             """Health check endpoint."""
             return {"status": "healthy", "service": "shadowhound-web"}
-        
+
         @app.post("/api/mission", response_model=MissionResponse)
         async def send_mission(cmd: MissionCommand):
             """Send mission command to robot."""
             try:
                 result = self.command_callback(cmd.command)
-                
+
                 # Broadcast to WebSocket clients
                 await self.broadcast(f"COMMAND: {cmd.command}")
-                
+
                 return MissionResponse(
                     success=result.get("success", False),
                     message=result.get("message", "Unknown result"),
-                    command=cmd.command
+                    command=cmd.command,
                 )
             except Exception as e:
                 self.logger.error(f"Error executing command: {e}")
                 return MissionResponse(
-                    success=False,
-                    message=str(e),
-                    command=cmd.command
+                    success=False, message=str(e), command=cmd.command
                 )
-        
+
         @app.websocket("/ws/status")
         async def websocket_status(websocket: WebSocket):
             """WebSocket endpoint for real-time status updates."""
             await websocket.accept()
             self.active_connections.append(websocket)
-            
+
             try:
                 # Keep connection alive
                 while True:
@@ -145,9 +145,9 @@ class WebInterface:
             except WebSocketDisconnect:
                 self.active_connections.remove(websocket)
                 self.logger.info("WebSocket client disconnected")
-        
+
         return app
-    
+
     def _get_dashboard_html(self) -> str:
         """Generate dashboard HTML."""
         return """
@@ -391,12 +391,12 @@ class WebInterface:
 </body>
 </html>
         """
-    
+
     async def broadcast(self, message: str):
         """Broadcast message to all connected WebSocket clients."""
         if not self.active_connections:
             return
-            
+
         disconnected = []
         for connection in self.active_connections:
             try:
@@ -404,41 +404,37 @@ class WebInterface:
             except Exception as e:
                 self.logger.warning(f"Failed to send to WebSocket client: {e}")
                 disconnected.append(connection)
-        
+
         # Remove disconnected clients
         for conn in disconnected:
             if conn in self.active_connections:
                 self.active_connections.remove(conn)
-    
+
     def broadcast_sync(self, message: str):
         """Synchronous wrapper for broadcast (for use from non-async code)."""
         if self.active_connections:
             asyncio.run(self.broadcast(message))
-    
+
     def start(self):
         """Start web server in background thread."""
+
         def run_server():
             config = uvicorn.Config(
-                self.app,
-                host=self.host,
-                port=self.port,
-                log_level="info"
+                self.app, host=self.host, port=self.port, log_level="info"
             )
             self.server = uvicorn.Server(config)
             self.server.run()
-        
+
         self.server_thread = threading.Thread(
-            target=run_server,
-            daemon=True,
-            name="WebInterface"
+            target=run_server, daemon=True, name="WebInterface"
         )
         self.server_thread.start()
-        
+
         self.logger.info(f"🌐 Web interface starting on http://{self.host}:{self.port}")
         self.logger.info(f"   Dashboard: http://localhost:{self.port}/")
         self.logger.info(f"   API: http://localhost:{self.port}/api/mission")
         self.logger.info(f"   WebSocket: ws://localhost:{self.port}/ws/status")
-    
+
     def stop(self):
         """Stop web server."""
         if self.server:
@@ -451,23 +447,18 @@ if __name__ == "__main__":
     # Example callback
     def handle_command(command: str) -> dict:
         print(f"Received command: {command}")
-        return {
-            "success": True,
-            "message": f"Executed: {command}"
-        }
-    
+        return {"success": True, "message": f"Executed: {command}"}
+
     # Create and start web interface
-    web = WebInterface(
-        command_callback=handle_command,
-        port=8080
-    )
+    web = WebInterface(command_callback=handle_command, port=8080)
     web.start()
-    
+
     print("Web interface running on http://localhost:8080")
     print("Press Ctrl+C to stop")
-    
+
     try:
         import time
+
         while True:
             time.sleep(1)
     except KeyboardInterrupt:
