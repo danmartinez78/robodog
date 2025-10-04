@@ -8,46 +8,60 @@ An autonomous mobile robot system that combines ROS2 navigation with LLM/VLM-dri
 
 ## Quick Start
 
-### Prerequisites
-- **Docker** with dev containers support
-- **VS Code** with [Dev Containers extension](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-containers)
-- **Git** for cloning the repository
-
-### 1. Open in Dev Container
+### 🚀 Fastest Start (Recommended)
 
 ```bash
-# Clone the repository
+# 1. Clone the repository
 git clone https://github.com/danmartinez78/shadowhound.git
 cd shadowhound
 
-# Open in VS Code
+# 2. Open in VS Code dev container
 code .
+# (Click "Reopen in Container" when prompted)
+
+# 3. Run the start script
+./start.sh --dev
 ```
 
-When VS Code opens, you'll be prompted to "Reopen in Container" - click it!
-The container provides:
+That's it! The script handles everything:
+- ✓ Checks dependencies
+- ✓ Creates configuration (.env)
+- ✓ Builds the workspace
+- ✓ Launches the system
+- ✓ Opens web dashboard at http://localhost:8080
+
+Try a mission: "patrol around the room" 🤖
+
+### 📚 For More Control
+
+See [`SCRIPTS.md`](SCRIPTS.md) for all available scripts and options:
+- `./start.sh` - Smart interactive launcher
+- `./scripts/quick-start-dev.sh` - One-command development start
+- `./scripts/check-deps.sh` - Verify dependencies
+- `./scripts/test-web-only.sh` - Test web interface alone
+
+### Prerequisites
+- **Docker** with dev containers support
+- **VS Code** with [Dev Containers extension](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-containers)
+- **OpenAI API Key** - Get one from [OpenAI Platform](https://platform.openai.com/api-keys)
+
+### Dev Container Features
+The container provides everything you need:
 - ✅ ROS2 Humble Desktop Full
 - ✅ Navigation2 stack
 - ✅ CycloneDDS middleware
 - ✅ Python tools (black, isort, pylint, mypy, pytest)
-- ✅ C++ development tools
+- ✅ DIMOS framework with LLM integration
 - ✅ Helpful aliases (`cb`, `source-ws`, `rosdep-install`)
 
-### 2. Build the Workspace
+### Manual Setup (if needed)
 
 ```bash
 # Inside the container terminal:
 cb              # Build with colcon (alias for colcon build --symlink-install)
 source-ws       # Source the workspace (alias for source install/setup.bash)
-```
 
-### 3. Verify Setup
-
-```bash
-# Check ROS environment
-printenv | grep ROS
-
-# List shadowhound packages (when created)
+# Verify setup
 ros2 pkg list | grep shadowhound
 ```
 
