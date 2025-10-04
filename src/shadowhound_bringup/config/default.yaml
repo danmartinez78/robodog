@@ -1,0 +1,15 @@
+# ShadowHound Configuration
+# Default parameters for the autonomous robot system
+
+mission_agent:
+  ros__parameters:
+    # Agent configuration
+    agent_backend: "cloud"        # cloud (OpenAI) or local
+    use_planning_agent: false     # Use planning agent for complex missions
+    
+    # Robot configuration
+    mock_robot: true              # Use mock robot connection
+    disable_video_stream: true    # Disable video streaming (save bandwidth)
+    
+    # Logging
+    log_level: "INFO"             # DEBUG, INFO, WARN, ERROR
