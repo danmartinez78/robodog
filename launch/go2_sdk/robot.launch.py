@@ -192,6 +192,7 @@ class Go2NodeFactory:
                 }],
             ),
             # Image republisher to convert raw to compressed
+            # Use BEST_EFFORT QoS to match sensor data expectations
             Node(
                 package='image_transport',
                 executable='republish',
@@ -201,6 +202,10 @@ class Go2NodeFactory:
                     ('in', 'camera/image_raw'),
                     ('out/compressed', 'camera/compressed'),
                 ],
+                parameters=[{
+                    'qos_overrides./camera/compressed.publisher.reliability': 'best_effort',
+                    'qos_overrides./camera/compressed.publisher.durability': 'volatile',
+                }],
                 output='screen',
             ),
             # LiDAR processing node (new separate package)
