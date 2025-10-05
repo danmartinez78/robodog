@@ -10,6 +10,12 @@ log/
 .env.local
 *.env.backup
 
+# DIMOS / AI output and data
+assets/output/
+chroma.sqlite3
+*.sqlite3
+*.db
+
 # IDE and editor files
 .vscode/
 *.swp
