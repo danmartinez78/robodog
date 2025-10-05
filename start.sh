@@ -892,13 +892,14 @@ verify_robot_topics() {
         print_info "Waiting for Nav2 action servers to register..."
         sleep 3
         
+        # DISABLED: Costmap trigger - can cause driver issues
         # Trigger costmap publication with a small movement
-        print_info "Triggering costmap publication (small robot movement)..."
-        if command -v python3 &> /dev/null && [ -f "scripts/trigger_costmap.py" ]; then
-            python3 scripts/trigger_costmap.py
-        else
-            print_warning "Costmap trigger script not found - costmaps may not publish until robot moves"
-        fi
+        # print_info "Triggering costmap publication (small robot movement)..."
+        # if command -v python3 &> /dev/null && [ -f "scripts/trigger_costmap.py" ]; then
+        #     python3 scripts/trigger_costmap.py
+        # else
+        #     print_warning "Costmap trigger script not found - costmaps may not publish until robot moves"
+        # fi
     fi
     
     echo ""
