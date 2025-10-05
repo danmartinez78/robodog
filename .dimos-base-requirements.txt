@@ -38,13 +38,29 @@ pytest
 pytest-asyncio==0.26.0
 asyncio==3.4.3
 
-# Data processing
+# Data Processing
 numpy<2
-opencv-python
-ffmpeg-python
+opencv-python==4.10.0.84
+opencv-contrib-python==4.10.0.84
+pandas
+Pillow
 
 # Messaging
 pyzmq
+
+# Perception Dependencies (required for YOLO object detection)
+ultralytics>=8.3.70
+filterpy>=1.4.5
+scipy>=1.15.1
+scikit-learn
+mmengine>=0.10.3
+mmcv>=2.1.0
+timm>=1.0.15
+lap>=0.5.12
+# xformers==0.0.20 - Skipped (CUDA-specific, causes issues on CPU-only systems)
+
+# Git-based packages (must come last)
+git+https://github.com/dimensionalOS/rxpy-backpressure.git
 
 # Audio
 sounddevice
