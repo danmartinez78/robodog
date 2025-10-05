@@ -766,6 +766,9 @@ launch_robot_driver() {
     
     local go2_ip=${GO2_IP:-192.168.10.167}
     
+    # Export ROBOT_IP for the launch file (it reads this env var)
+    export ROBOT_IP=$go2_ip
+    
     # Ping robot one more time
     print_info "Verifying robot connectivity at $go2_ip..."
     if ! ping -c 1 -W 2 "$go2_ip" &> /dev/null; then
