@@ -111,7 +111,7 @@ print_section() {
 
 # Set ROS_DOMAIN_ID if not already set (for topic/node visibility)
 if [ -z "$ROS_DOMAIN_ID" ]; then
-    export ROS_DOMAIN_ID=42
+    export ROS_DOMAIN_ID=0
 fi
 
 # ============================================================================
@@ -671,7 +671,7 @@ show_summary() {
 # Source this file in other terminals to access the same ROS domain:
 #   source .shadowhound_env
 
-export ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-42}
+export ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
 export GO2_IP=${GO2_IP:-192.168.10.167}
 export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
 
@@ -696,7 +696,7 @@ EOF
     echo "  • Mock Robot: ${MOCK_ROBOT:-false}"
     echo "  • Web Interface: ${WEB_INTERFACE:-true}"
     echo "  • Web Port: ${WEB_PORT:-8080}"
-    echo "  • ROS Domain: ${ROS_DOMAIN_ID:-42}"
+    echo "  • ROS Domain: ${ROS_DOMAIN_ID:-0}"
     echo "  • OpenAI Model: ${OPENAI_MODEL:-gpt-4o}"
     echo ""
     echo -e "${CYAN}${INFO} To access ROS topics in another terminal, run:${NC}"

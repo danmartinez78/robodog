@@ -44,7 +44,7 @@ else
     echo -e "${YELLOW}⚠${NC} .shadowhound_env not found (start.sh hasn't run yet)"
     echo -e "${YELLOW}⚠${NC} Using default values"
     
-    export ROS_DOMAIN_ID=42
+    export ROS_DOMAIN_ID=0
     export GO2_IP=${GO2_IP:-192.168.10.167}
     export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
     
