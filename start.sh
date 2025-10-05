@@ -1123,7 +1123,15 @@ kill_all_ros_nodes() {
 # Cleanup Handler
 # ============================================================================
 
+CLEANUP_DONE=false
+
 cleanup() {
+    # Prevent re-entry
+    if [ "$CLEANUP_DONE" = true ]; then
+        return 0
+    fi
+    CLEANUP_DONE=true
+    
     echo ""
     print_section "Shutting Down"
     print_info "Cleaning up..."
@@ -1182,6 +1190,9 @@ cleanup() {
     
     print_success "Shutdown complete"
     echo ""
+    
+    # Exit cleanly
+    exit 0
 }
 
 trap cleanup EXIT INT TERM
