@@ -134,61 +134,74 @@ class MissionAgentNode(Node):
         self.get_logger().info("=" * 60)
         self.get_logger().info("🔍 TOPIC DIAGNOSTICS")
         self.get_logger().info("=" * 60)
-        
+
         # Get all topics
         topic_names_and_types = self.get_topic_names_and_types()
-        
+
         # Filter for robot-related topics
         robot_topics = [
-            (name, types) for name, types in topic_names_and_types
-            if any(keyword in name for keyword in [
-                'go2', 'camera', 'imu', 'odom', 'costmap', 'cmd_vel', 'webrtc'
-            ])
+            (name, types)
+            for name, types in topic_names_and_types
+            if any(
+                keyword in name
+                for keyword in [
+                    "go2",
+                    "camera",
+                    "imu",
+                    "odom",
+                    "costmap",
+                    "cmd_vel",
+                    "webrtc",
+                ]
+            )
         ]
-        
+
         if robot_topics:
             self.get_logger().info(f"Found {len(robot_topics)} robot-related topics:")
             for name, types in sorted(robot_topics):
                 self.get_logger().info(f"  • {name} [{', '.join(types)}]")
         else:
-            self.get_logger().warn("⚠️  No robot topics found! Is the robot driver running?")
-        
+            self.get_logger().warn(
+                "⚠️  No robot topics found! Is the robot driver running?"
+            )
+
         # Check for specific critical topics
         critical_topics = {
-            '/go2_states': 'Robot state data',
-            '/camera/image_raw': 'Camera feed',
-            '/imu': 'IMU data',
-            '/odom': 'Odometry',
-            '/local_costmap/costmap': 'Local costmap',
-            '/cmd_vel_out': 'Velocity commands',
+            "/go2_states": "Robot state data",
+            "/camera/image_raw": "Camera feed",
+            "/imu": "IMU data",
+            "/odom": "Odometry",
+            "/local_costmap/costmap": "Local costmap",
+            "/cmd_vel_out": "Velocity commands",
         }
-        
+
         self.get_logger().info("\nCritical topic status:")
         for topic, description in critical_topics.items():
             found = any(name == topic for name, _ in topic_names_and_types)
             status = "✅" if found else "❌"
             self.get_logger().info(f"  {status} {topic} ({description})")
-        
+
         # List all action servers
         try:
             import time
+
             time.sleep(0.5)  # Give action servers time to advertise
-            
+
             from rclpy.action import ActionClient
             from nav2_msgs.action import Spin
-            
+
             # Check if /spin action exists
-            spin_client = ActionClient(self, Spin, 'spin')
+            spin_client = ActionClient(self, Spin, "spin")
             spin_available = spin_client.wait_for_server(timeout_sec=1.0)
             spin_client.destroy()
-            
+
             self.get_logger().info("\nNav2 action server status:")
             status = "✅" if spin_available else "❌"
             self.get_logger().info(f"  {status} /spin action server")
-            
+
         except Exception as e:
             self.get_logger().warn(f"Could not check action servers: {e}")
-        
+
         self.get_logger().info("=" * 60)
 
     def _init_agent(self):
