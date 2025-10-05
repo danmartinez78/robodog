@@ -18,6 +18,8 @@
 #   --web-port N   Set web port (default: 8080)
 #   --skip-update  Skip git repository update check
 #   --auto-update  Automatically pull updates without prompting
+#   --skip-driver  Skip launching robot driver (use existing)
+#   --agent-only   Only launch mission agent (skip driver + verification)
 #   --help         Show this help message
 #
 # Examples:
@@ -60,6 +62,8 @@ WEB_PORT=""
 CONFIG_MODE=""
 SKIP_UPDATE=false
 AUTO_UPDATE=false
+SKIP_DRIVER=false
+AGENT_ONLY=false
 
 # ============================================================================
 # Helper Functions
@@ -127,6 +131,14 @@ parse_args() {
                 ;;
             --auto-update)
                 AUTO_UPDATE=true
+                shift
+                ;;
+            --skip-driver)
+                SKIP_DRIVER=true
+                shift
+                ;;
+            --agent-only)
+                AGENT_ONLY=true
                 shift
                 ;;
             --help|-h)
@@ -658,19 +670,165 @@ show_summary() {
 }
 
 # ============================================================================
-# Launch System
+# Robot Driver Launch
 # ============================================================================
 
-launch_system() {
-    print_section "Launching ShadowHound"
-    
-    # Source ROS2 first
-    if [ -f "/opt/ros/humble/setup.bash" ]; then
-        source /opt/ros/humble/setup.bash
+launch_robot_driver() {
+    if [ "$MOCK_ROBOT" = "true" ]; then
+        print_info "Mock robot mode - skipping robot driver launch"
+        return 0
     fi
     
-    # Source workspace
-    source install/setup.bash
+    print_section "Stage 1: Launching Robot Driver"
+    
+    local go2_ip=${GO2_IP:-192.168.10.167}
+    
+    # Ping robot one more time
+    print_info "Verifying robot connectivity at $go2_ip..."
+    if ! ping -c 1 -W 2 "$go2_ip" &> /dev/null; then
+        print_error "Robot not reachable at $go2_ip"
+        print_info "Make sure robot is powered on and connected"
+        return 1
+    fi
+    print_success "Robot is reachable"
+    
+    # Check if robot driver is already running
+    if ros2 topic list 2>/dev/null | grep -q "/go2_states"; then
+        print_warning "Robot driver already running (topics detected)"
+        read -p "Use existing driver? [Y/n]: " use_existing
+        if [[ "$use_existing" != "n" && "$use_existing" != "N" ]]; then
+            print_success "Using existing robot driver"
+            return 0
+        else
+            print_info "Stopping existing driver..."
+            pkill -f "go2_driver_node" 2>/dev/null || true
+            pkill -f "robot.launch" 2>/dev/null || true
+            sleep 2
+        fi
+    fi
+    
+    # Determine which launch file to use
+    local robot_launch="launch/go2_sdk/robot.launch.py"
+    if [ ! -f "$robot_launch" ]; then
+        robot_launch="src/dimos-unitree/dimos/robot/unitree/external/go2_ros2_sdk/launch/robot.launch.py"
+    fi
+    
+    if [ ! -f "$robot_launch" ]; then
+        print_error "Robot launch file not found"
+        print_info "Expected: launch/go2_sdk/robot.launch.py"
+        return 1
+    fi
+    
+    print_info "Launching robot driver in background..."
+    print_info "Launch file: $robot_launch"
+    echo ""
+    
+    # Launch robot driver in background with log file
+    local log_file="/tmp/shadowhound_robot_driver.log"
+    ros2 launch "$robot_launch" > "$log_file" 2>&1 &
+    local driver_pid=$!
+    
+    print_success "Robot driver launched (PID: $driver_pid)"
+    print_info "Logs: $log_file"
+    echo ""
+    
+    # Wait for topics to appear
+    print_info "Waiting for robot topics to appear..."
+    local max_wait=30
+    local waited=0
+    
+    while [ $waited -lt $max_wait ]; do
+        if ros2 topic list 2>/dev/null | grep -q "/go2_states"; then
+            print_success "Robot topics detected!"
+            break
+        fi
+        
+        # Check if driver process is still alive
+        if ! kill -0 $driver_pid 2>/dev/null; then
+            print_error "Robot driver process died"
+            print_info "Check logs: $log_file"
+            tail -20 "$log_file"
+            return 1
+        fi
+        
+        echo -n "."
+        sleep 1
+        waited=$((waited + 1))
+    done
+    echo ""
+    
+    if [ $waited -ge $max_wait ]; then
+        print_error "Timeout waiting for robot topics"
+        print_info "Driver may still be starting. Check logs: $log_file"
+        return 1
+    fi
+    
+    # Save PID for cleanup
+    echo $driver_pid > /tmp/shadowhound_driver.pid
+    
+    return 0
+}
+
+# ============================================================================
+# Verify Robot Topics
+# ============================================================================
+
+verify_robot_topics() {
+    if [ "$MOCK_ROBOT" = "true" ]; then
+        print_info "Mock robot mode - skipping topic verification"
+        return 0
+    fi
+    
+    print_section "Stage 2: Verifying Robot Topics"
+    
+    # Run our diagnostic script
+    print_info "Running topic diagnostics..."
+    echo ""
+    
+    if command -v python3 &> /dev/null && [ -f "scripts/check_topics.py" ]; then
+        python3 scripts/check_topics.py
+    else
+        # Fallback: manual check
+        print_info "Checking critical topics..."
+        
+        local critical_topics=(
+            "/go2_states"
+            "/camera/image_raw"
+            "/imu"
+            "/odom"
+        )
+        
+        local all_ok=true
+        for topic in "${critical_topics[@]}"; do
+            if ros2 topic list 2>/dev/null | grep -q "^${topic}$"; then
+                print_success "$topic"
+            else
+                print_warning "$topic (missing)"
+                all_ok=false
+            fi
+        done
+        
+        if [ "$all_ok" = false ]; then
+            print_warning "Some topics are missing"
+        fi
+    fi
+    
+    echo ""
+    read -p "Topics look good? Continue to launch mission agent? [Y/n]: " continue_choice
+    if [[ "$continue_choice" = "n" || "$continue_choice" = "N" ]]; then
+        print_info "Launch aborted by user"
+        return 1
+    fi
+    
+    return 0
+}
+
+# ============================================================================
+# Launch Mission Agent
+# ============================================================================
+
+launch_mission_agent() {
+    print_section "Stage 3: Launching Mission Agent"
     
     # Build launch command
     local launch_cmd="ros2 launch shadowhound_mission_agent mission_agent.launch.py"
@@ -692,12 +850,86 @@ launch_system() {
     echo "  $launch_cmd"
     echo ""
     
-    print_success "Starting ShadowHound..."
+    if [ "${WEB_INTERFACE:-true}" != "false" ]; then
+        echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+        echo -e "${GREEN}${WEB} Web Dashboard will be available at: http://localhost:${WEB_PORT:-8080}${NC}"
+        echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+        echo ""
+    fi
+    
+    print_success "Starting Mission Agent..."
     echo ""
-    echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
     
     # Launch!
     $launch_cmd
+}
+
+# ============================================================================
+# Orchestrated Launch System
+# ============================================================================
+
+launch_system() {
+    print_section "Orchestrated System Launch"
+    
+    # Source ROS2 first
+    if [ -f "/opt/ros/humble/setup.bash" ]; then
+        source /opt/ros/humble/setup.bash
+    fi
+    
+    # Source workspace
+    source install/setup.bash
+    
+    # Set PYTHONPATH for DIMOS
+    export PYTHONPATH="${SCRIPT_DIR}/src/dimos-unitree:${PYTHONPATH}"
+    
+    # Agent-only mode: skip driver and verification
+    if [ "$AGENT_ONLY" = true ]; then
+        print_info "Agent-only mode: Skipping driver launch and verification"
+        echo ""
+        launch_mission_agent
+        return $?
+    fi
+    
+    echo ""
+    print_info "Launch sequence:"
+    if [ "$SKIP_DRIVER" = true ] || [ "$MOCK_ROBOT" = "true" ]; then
+        print_info "  1. [SKIPPED] Launch robot driver"
+        print_info "  2. [SKIPPED] Verify robot topics"
+        print_info "  3. Launch mission agent (DIMOS)"
+    else
+        print_info "  1. Launch robot driver (go2_ros2_sdk)"
+        print_info "  2. Verify robot topics are publishing"
+        print_info "  3. Launch mission agent (DIMOS)"
+    fi
+    echo ""
+    
+    # Stage 1: Launch robot driver (unless skipped)
+    if [ "$SKIP_DRIVER" != true ]; then
+        if ! launch_robot_driver; then
+            print_error "Failed to launch robot driver"
+            read -p "Continue anyway? [y/N]: " continue_choice
+            if [[ "$continue_choice" != "y" && "$continue_choice" != "Y" ]]; then
+                return 1
+            fi
+        fi
+        sleep 2
+    else
+        print_info "Skipping robot driver launch (--skip-driver flag)"
+    fi
+    
+    # Stage 2: Verify topics (unless skipped or mock mode)
+    if [ "$SKIP_DRIVER" != true ] && [ "$MOCK_ROBOT" != "true" ]; then
+        if ! verify_robot_topics; then
+            print_error "Topic verification failed"
+            read -p "Launch mission agent anyway? [y/N]: " continue_choice
+            if [[ "$continue_choice" != "y" && "$continue_choice" != "Y" ]]; then
+                return 1
+            fi
+        fi
+    fi
+    
+    # Stage 3: Launch mission agent
+    launch_mission_agent
 }
 
 # ============================================================================
@@ -709,8 +941,24 @@ cleanup() {
     print_section "Shutting Down"
     print_info "Cleaning up..."
     
-    # Kill any remaining processes
+    # Kill mission agent
     pkill -f "shadowhound_mission_agent" 2>/dev/null || true
+    
+    # Kill robot driver if we started it
+    if [ -f "/tmp/shadowhound_driver.pid" ]; then
+        local driver_pid=$(cat /tmp/shadowhound_driver.pid 2>/dev/null)
+        if [ -n "$driver_pid" ]; then
+            print_info "Stopping robot driver (PID: $driver_pid)..."
+            kill $driver_pid 2>/dev/null || true
+            sleep 1
+            kill -9 $driver_pid 2>/dev/null || true
+        fi
+        rm -f /tmp/shadowhound_driver.pid
+    fi
+    
+    # Kill any remaining go2 processes
+    pkill -f "go2_driver_node" 2>/dev/null || true
+    pkill -f "robot.launch" 2>/dev/null || true
     
     print_success "Shutdown complete"
     echo ""

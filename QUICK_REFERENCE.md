@@ -25,17 +25,26 @@ python3 scripts/check_topics.py
 
 ### Launch System
 ```bash
-# Development mode with update check
+# Full orchestrated launch (driver + agent)
 ./start.sh --dev
 
 # Auto-update and launch
 ./start.sh --dev --auto-update
+
+# Skip driver (use existing)
+./start.sh --dev --skip-driver
+
+# Agent only (fast iteration)
+./start.sh --dev --agent-only
 
 # Skip update check (testing local changes)
 ./start.sh --dev --skip-update
 
 # Production mode
 ./start.sh --prod
+
+# Mock robot (no hardware)
+./start.sh --dev --mock
 ```
 
 ### Build & Source
