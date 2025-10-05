@@ -413,7 +413,14 @@ class WebInterface:
     def broadcast_sync(self, message: str):
         """Synchronous wrapper for broadcast (for use from non-async code)."""
         if self.active_connections:
-            asyncio.run(self.broadcast(message))
+            # Get or create event loop
+            try:
+                loop = asyncio.get_running_loop()
+                # Already in event loop, use create_task
+                asyncio.create_task(self.broadcast(message))
+            except RuntimeError:
+                # No event loop, create one
+                asyncio.run(self.broadcast(message))
 
     def start(self):
         """Start web server in background thread."""

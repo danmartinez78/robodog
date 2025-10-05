@@ -266,7 +266,9 @@ class MissionAgentNode(Node):
             if self.use_planning:
                 result = self.agent.plan_and_execute(command)
             else:
-                result = self.agent.process_text(command)
+                # OpenAIAgent uses run_observable_query() which returns an Observable
+                # Call .run() to execute synchronously and get the result
+                result = self.agent.run_observable_query(command).run()
 
             # Broadcast status to all web clients
             if self.web:
@@ -300,7 +302,9 @@ class MissionAgentNode(Node):
                 result = self.agent.plan_and_execute(command)
             else:
                 # Basic agent processes command directly
-                result = self.agent.process_text(command)
+                # OpenAIAgent uses run_observable_query() which returns an Observable
+                # Call .run() to execute synchronously and get the result
+                result = self.agent.run_observable_query(command).run()
 
             # Publish result
             status.data = f"COMPLETED: {command} | Result: {result}"
