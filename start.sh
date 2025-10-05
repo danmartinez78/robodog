@@ -55,6 +55,13 @@ ROCKET="🚀"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
+# Load .env file if it exists (do this early to get ROS_DOMAIN_ID)
+if [ -f ".env" ]; then
+    set -a  # automatically export all variables
+    source .env
+    set +a
+fi
+
 # Default options
 MOCK_ROBOT=""
 WEB_INTERFACE=""
@@ -97,6 +104,15 @@ print_section() {
     echo ""
     echo -e "${CYAN}── $1 ──────────────────────────────────────────────────────${NC}"
 }
+
+# ============================================================================
+# ROS Environment Setup
+# ============================================================================
+
+# Set ROS_DOMAIN_ID if not already set (for topic/node visibility)
+if [ -z "$ROS_DOMAIN_ID" ]; then
+    export ROS_DOMAIN_ID=42
+fi
 
 # ============================================================================
 # Parse Command Line Arguments
@@ -649,14 +665,42 @@ check_network() {
 show_summary() {
     print_section "Pre-flight Summary"
     
+    # Create environment file for other terminals
+    cat > "$SCRIPT_DIR/.shadowhound_env" << EOF
+# ShadowHound Environment
+# Source this file in other terminals to access the same ROS domain:
+#   source .shadowhound_env
+
+export ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-42}
+export GO2_IP=${GO2_IP:-192.168.10.167}
+export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+
+# Source ROS2
+if [ -f "/opt/ros/humble/setup.bash" ]; then
+    source /opt/ros/humble/setup.bash
+fi
+
+# Source workspace
+if [ -f "$SCRIPT_DIR/install/setup.bash" ]; then
+    source "$SCRIPT_DIR/install/setup.bash"
+fi
+
+echo "✓ ShadowHound environment loaded"
+echo "  ROS_DOMAIN_ID: \$ROS_DOMAIN_ID"
+echo "  GO2_IP: \$GO2_IP"
+EOF
+    
     echo ""
     echo "Configuration:"
     echo "  • Mode: ${CONFIG_MODE:-default}"
     echo "  • Mock Robot: ${MOCK_ROBOT:-false}"
     echo "  • Web Interface: ${WEB_INTERFACE:-true}"
     echo "  • Web Port: ${WEB_PORT:-8080}"
-    echo "  • ROS Domain: ${ROS_DOMAIN_ID:-0}"
+    echo "  • ROS Domain: ${ROS_DOMAIN_ID:-42}"
     echo "  • OpenAI Model: ${OPENAI_MODEL:-gpt-4o}"
+    echo ""
+    echo -e "${CYAN}${INFO} To access ROS topics in another terminal, run:${NC}"
+    echo -e "${CYAN}    source .shadowhound_env${NC}"
     echo ""
     
     if [ "${WEB_INTERFACE:-true}" != "false" ]; then
