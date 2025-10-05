@@ -67,18 +67,24 @@ class MissionAgentNode(Node):
         # Initialize robot interface
         self.get_logger().info("Initializing robot interface...")
         try:
-            ros_control = UnitreeROSControl(mock_connection=self.mock_robot)
-            
+            # Disable costmap for development (not needed without nav stack)
+            ros_control = UnitreeROSControl(
+                mock_connection=self.mock_robot,
+                costmap_topic=""  # Disable costmap - not needed for basic operation
+            )
+
             # Get robot IP from environment (required even for mock mode)
             robot_ip = os.getenv("GO2_IP", "192.168.1.103")
-            
+
             self.robot = UnitreeGo2(
                 ros_control=ros_control,
                 ip=robot_ip,  # Required for WebRTC connection
                 mock_connection=self.mock_robot,  # Pass mock flag to UnitreeGo2
                 disable_video_stream=True,  # Can be enabled when needed
             )
-            self.get_logger().info(f"Robot initialized (mock={self.mock_robot}, ip={robot_ip})")
+            self.get_logger().info(
+                f"Robot initialized (mock={self.mock_robot}, ip={robot_ip})"
+            )
         except Exception as e:
             self.get_logger().error(f"Failed to initialize robot: {e}")
             raise
