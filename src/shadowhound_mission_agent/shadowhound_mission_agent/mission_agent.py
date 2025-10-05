@@ -269,11 +269,13 @@ class MissionAgentNode(Node):
                 # Call .run() to execute synchronously and get the result
                 result = self.agent.run_observable_query(command).run()
 
-            # Broadcast status to all web clients
+            # Broadcast the actual response to all web clients
             if self.web:
-                self.web.broadcast_sync(f"COMPLETED: {command}")
+                # Show the agent's response, not just generic completion message
+                response_preview = result[:200] if len(result) > 200 else result
+                self.web.broadcast_sync(f"✅ {response_preview}")
 
-            return {"success": True, "message": f"Mission completed: {result}"}
+            return {"success": True, "message": result}
 
         except Exception as e:
             self.get_logger().error(f"Web mission failed: {e}")
@@ -310,9 +312,10 @@ class MissionAgentNode(Node):
             self.status_pub.publish(status)
             self.get_logger().info(f"Mission completed: {result}")
 
-            # Broadcast to web interface
+            # Broadcast to web interface with actual response
             if self.web:
-                self.web.broadcast_sync(f"COMPLETED: {command}")
+                response_preview = result[:200] if len(result) > 200 else result
+                self.web.broadcast_sync(f"✅ {response_preview}")
 
         except Exception as e:
             self.get_logger().error(f"Mission failed: {e}")
