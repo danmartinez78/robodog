@@ -208,6 +208,13 @@ git checkout <commit-before-troubleshooting> -- src/shadowhound_mission_agent/sh
 
 ### Investigation Steps for Tomorrow
 
+#### Quick Comparison (Automated)
+```bash
+cd ~/shadowhound
+./scripts/compare_go2_sdk_forks.sh
+# Review differences and decide if driver testing needed
+```
+
 #### 1. Verify mock_connection is actually True at runtime
 Add debug logging to DIMOS code:
 ```python
@@ -268,6 +275,70 @@ ros2 node info /unitree_hardware_interface  # Check subscriptions/publishers
 ps aux | grep mission_agent
 strace -p <PID>  # See what system calls it's blocked on
 ```
+
+#### 7. Compare go2_ros2_sdk forks
+Investigate differences between upstream and DIMOS fork to see if driver changes cause the hang.
+
+**Upstream**: https://github.com/dimensionalOS/go2_ros2_sdk  
+**DIMOS Fork**: `src/dimos-unitree/dimos/robot/unitree/external/go2_ros2_sdk`
+
+**Comparison Steps**:
+```bash
+# Clone upstream for comparison
+cd /tmp
+git clone https://github.com/dimensionalOS/go2_ros2_sdk.git upstream_go2_sdk
+
+# Compare key files
+cd ~/shadowhound
+
+# Check go2_driver_node implementation
+diff -u /tmp/upstream_go2_sdk/go2_robot_sdk/go2_robot_sdk/go2_driver_node.py \
+        src/dimos-unitree/dimos/robot/unitree/external/go2_ros2_sdk/go2_robot_sdk/go2_robot_sdk/go2_driver_node.py
+
+# Check launch files
+diff -u /tmp/upstream_go2_sdk/go2_robot_sdk/launch/robot.launch.py \
+        src/dimos-unitree/dimos/robot/unitree/external/go2_ros2_sdk/go2_robot_sdk/launch/robot.launch.py
+
+# List all Python files that differ
+diff -qr /tmp/upstream_go2_sdk/go2_robot_sdk/go2_robot_sdk/ \
+         src/dimos-unitree/dimos/robot/unitree/external/go2_ros2_sdk/go2_robot_sdk/go2_robot_sdk/ \
+    | grep "\.py"
+```
+
+**Key Areas to Investigate**:
+1. **Topic names/QoS**: Does upstream publish different topics or use different QoS?
+2. **Initialization order**: Does upstream driver initialize differently?
+3. **Node lifecycle**: Does DIMOS fork change how nodes start/stop?
+4. **Action servers**: Does upstream provide Nav2 action servers differently?
+5. **Camera handling**: Different camera topic configuration?
+
+**Test with Upstream Driver**:
+```bash
+# Temporarily switch to upstream driver
+cd ~/shadowhound
+mv src/dimos-unitree/dimos/robot/unitree/external/go2_ros2_sdk src/dimos-unitree/dimos/robot/unitree/external/go2_ros2_sdk.dimos_fork
+ln -s /tmp/upstream_go2_sdk src/dimos-unitree/dimos/robot/unitree/external/go2_ros2_sdk
+
+# Rebuild and test
+colcon build --packages-select go2_robot_sdk go2_interfaces unitree_go lidar_processor
+source install/setup.bash
+ros2 launch go2_robot_sdk robot.launch.py
+
+# In another terminal, try mission agent
+export PYTHONPATH="$HOME/shadowhound/src/dimos-unitree:$PYTHONPATH"
+source install/setup.bash
+ros2 launch shadowhound_mission_agent mission_agent.launch.py mock_robot:=false
+
+# Revert when done
+rm src/dimos-unitree/dimos/robot/unitree/external/go2_ros2_sdk
+mv src/dimos-unitree/dimos/robot/unitree/external/go2_ros2_sdk.dimos_fork \
+   src/dimos-unitree/dimos/robot/unitree/external/go2_ros2_sdk
+```
+
+**Expected Findings**:
+- If mission agent works with upstream → DIMOS fork has breaking changes
+- If mission agent still hangs → Issue is in DIMOS robot interface code, not driver
+- Compare topic outputs: `ros2 topic list` with both versions
 
 ---
 
