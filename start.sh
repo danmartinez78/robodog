@@ -909,8 +909,11 @@ verify_robot_topics() {
     print_info "Running topic diagnostics..."
     echo ""
     
+    local topics_ok=true
     if command -v python3 &> /dev/null && [ -f "scripts/check_topics.py" ]; then
-        python3 scripts/check_topics.py
+        if ! python3 scripts/check_topics.py; then
+            topics_ok=false
+        fi
     else
         # Fallback: manual check
         print_info "Checking critical topics..."
@@ -938,6 +941,18 @@ verify_robot_topics() {
     fi
     
     echo ""
+    
+    # If critical topics are missing, abort
+    if [ "$topics_ok" = false ]; then
+        print_error "Critical topics are missing - cannot launch mission agent"
+        print_info "Please check that:"
+        print_info "  1. Robot is powered on and connected"
+        print_info "  2. Robot driver launched successfully"
+        print_info "  3. Check logs: /tmp/shadowhound_robot_driver.log"
+        return 1
+    fi
+    
+    # Topics look good, ask for final confirmation
     read -p "Topics look good? Continue to launch mission agent? [Y/n]: " continue_choice
     if [[ "$continue_choice" = "n" || "$continue_choice" = "N" ]]; then
         print_info "Launch aborted by user"

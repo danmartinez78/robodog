@@ -12,7 +12,9 @@ import sys
 class TopicDiagnostics(Node):
     def __init__(self):
         super().__init__("topic_diagnostics")
-
+        self.all_critical_found = True
+    
+    def check_topics(self):
         print("=" * 70)
         print("🔍 ROS2 TOPIC & ACTION DIAGNOSTICS")
         print("=" * 70)
@@ -64,10 +66,16 @@ class TopicDiagnostics(Node):
             "/odom": ("Odometry", True),
             "/cmd_vel_out": ("Velocity commands", True),
         }
-        
+
         optional_topics = {
-            "/local_costmap/costmap": ("Local costmap (Nav2, updates on movement)", False),
-            "/global_costmap/costmap": ("Global costmap (Nav2, updates on movement)", False),
+            "/local_costmap/costmap": (
+                "Local costmap (Nav2, updates on movement)",
+                False,
+            ),
+            "/global_costmap/costmap": (
+                "Global costmap (Nav2, updates on movement)",
+                False,
+            ),
         }
 
         print("🎯 Critical topic status:")
@@ -79,6 +87,8 @@ class TopicDiagnostics(Node):
             if not found and required:
                 all_critical_found = False
         
+        self.all_critical_found = all_critical_found
+
         print()
         print("📍 Optional topics (may appear on movement):")
         for topic, (description, _) in optional_topics.items():
@@ -115,7 +125,7 @@ class TopicDiagnostics(Node):
         print()
         print("=" * 70)
 
-        if all_critical_found:
+        if self.all_critical_found:
             print("✅ ALL CRITICAL TOPICS FOUND - Ready for mission agent!")
         else:
             print("⚠️  SOME CRITICAL TOPICS MISSING")
@@ -123,12 +133,16 @@ class TopicDiagnostics(Node):
 
         print("=" * 70)
 
+        return self.all_critical_found
+
 
 def main():
     rclpy.init()
 
+    all_ok = False
     try:
         node = TopicDiagnostics()
+        all_ok = node.check_topics()
         # Don't spin - we just want to check topics once
         node.destroy_node()
     except KeyboardInterrupt:
@@ -139,7 +153,8 @@ def main():
     finally:
         rclpy.shutdown()
 
-    return 0
+    # Return non-zero exit code if critical topics are missing
+    return 0 if all_ok else 1
 
 
 if __name__ == "__main__":
