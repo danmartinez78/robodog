@@ -324,8 +324,17 @@ build_workspace() {
     
     print_info "Building ShadowHound packages..."
     
-    # Build only our packages (skip DIMOS perception models with CUDA issues)
-    if colcon build --packages-select shadowhound_mission_agent shadowhound_bringup --symlink-install 2>&1 | tee /tmp/colcon_build.log; then
+    # Build Go2 ROS2 SDK interfaces first (needed by DIMOS)
+    print_info "Building Go2 ROS2 SDK interfaces..."
+    if colcon build --packages-select go2_interfaces --symlink-install 2>&1 | tee -a /tmp/colcon_build.log | tail -5; then
+        print_success "Go2 interfaces built"
+    else
+        print_warning "Go2 interfaces build had issues (may be OK if already built)"
+    fi
+    
+    # Build our packages (skip DIMOS perception models with CUDA issues)
+    print_info "Building ShadowHound mission agent..."
+    if colcon build --packages-select shadowhound_mission_agent shadowhound_bringup --symlink-install 2>&1 | tee -a /tmp/colcon_build.log; then
         print_success "Build completed successfully"
     else
         print_error "Build failed"
