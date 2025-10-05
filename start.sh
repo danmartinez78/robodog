@@ -724,8 +724,9 @@ launch_robot_driver() {
     echo ""
     
     # Launch robot driver in background with log file
+    # Explicitly enable Nav2 (required for DIMOS /spin action)
     local log_file="/tmp/shadowhound_robot_driver.log"
-    ros2 launch "$robot_launch" > "$log_file" 2>&1 &
+    ros2 launch "$robot_launch" nav2:=true > "$log_file" 2>&1 &
     local driver_pid=$!
     
     print_success "Robot driver launched (PID: $driver_pid)"
@@ -780,6 +781,16 @@ verify_robot_topics() {
     fi
     
     print_section "Stage 2: Verifying Robot Topics"
+    
+    # Check if Nav2 nodes are running
+    print_info "Checking Nav2 nodes..."
+    if ros2 node list 2>/dev/null | grep -q "behavior_server"; then
+        print_success "Nav2 nodes detected"
+    else
+        print_warning "Nav2 nodes not detected - DIMOS may fail to initialize"
+        print_info "Expected nodes: behavior_server, controller_server, planner_server"
+    fi
+    echo ""
     
     # Run our diagnostic script
     print_info "Running topic diagnostics..."
