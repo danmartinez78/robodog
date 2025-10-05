@@ -589,6 +589,7 @@ check_dependencies() {
     python3 -c "import filterpy" 2>/dev/null || missing+=("filterpy (DIMOS perception)")
     python3 -c "import transformers" 2>/dev/null || missing+=("transformers (DIMOS vision)")
     python3 -c "import mmengine" 2>/dev/null || missing+=("mmengine (Metric3D depth)")
+    python3 -c "import mmcv" 2>/dev/null || missing+=("mmcv (Metric3D depth)")
     
     if [ ${#missing[@]} -gt 0 ]; then
         print_warning "Missing Python packages: ${missing[*]}"
@@ -827,14 +828,34 @@ verify_robot_topics() {
     
     print_section "Stage 2: Verifying Robot Topics"
     
-    # Check if Nav2 nodes are running
-    print_info "Checking Nav2 nodes..."
-    if ros2 node list 2>/dev/null | grep -q "behavior_server"; then
-        print_success "Nav2 nodes detected"
-    else
-        print_warning "Nav2 nodes not detected - DIMOS may fail to initialize"
+    # Wait for Nav2 nodes to fully initialize (they take time after driver starts)
+    print_info "Waiting for Nav2 nodes to initialize..."
+    local nav2_wait=0
+    local nav2_max_wait=15
+    
+    while [ $nav2_wait -lt $nav2_max_wait ]; do
+        if ros2 node list 2>/dev/null | grep -q "behavior_server"; then
+            print_success "Nav2 nodes detected"
+            break
+        fi
+        echo -n "."
+        sleep 1
+        nav2_wait=$((nav2_wait + 1))
+    done
+    echo ""
+    
+    if [ $nav2_wait -ge $nav2_max_wait ]; then
+        print_warning "Nav2 nodes not detected after ${nav2_max_wait}s"
         print_info "Expected nodes: behavior_server, controller_server, planner_server"
+        print_warning "DIMOS may fail to initialize without /spin action"
     fi
+    
+    # Give Nav2 action servers a moment to register after nodes appear
+    if [ $nav2_wait -lt $nav2_max_wait ]; then
+        print_info "Waiting for Nav2 action servers to register..."
+        sleep 3
+    fi
+    
     echo ""
     
     # Run our diagnostic script
