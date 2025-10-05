@@ -17,7 +17,8 @@ from .web_interface import WebInterface
 try:
     from dimos.agents.agent import OpenAIAgent
     from dimos.agents.planning_agent import PlanningAgent
-    from dimos.robot.unitree import UnitreeGo2, UnitreeROSControl
+    from dimos.robot.unitree.unitree_go2 import UnitreeGo2
+    from dimos.robot.unitree.unitree_ros_control import UnitreeROSControl
     from dimos.robot.unitree.unitree_skills import UnitreeSkills
     from dimos.skills.skills import SkillLibrary
 
