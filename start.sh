@@ -1056,6 +1056,50 @@ launch_system() {
 }
 
 # ============================================================================
+# Pre-launch Cleanup
+# ============================================================================
+
+kill_all_ros_nodes() {
+    print_info "Killing any existing ROS nodes for clean start..."
+    
+    # Kill mission agent processes
+    pkill -f "shadowhound_mission_agent" 2>/dev/null || true
+    pkill -f "mission_agent.launch" 2>/dev/null || true
+    
+    # Kill robot driver processes
+    pkill -f "go2_driver_node" 2>/dev/null || true
+    pkill -f "robot.launch" 2>/dev/null || true
+    pkill -f "go2_rviz2" 2>/dev/null || true
+    
+    # Kill Nav2 nodes
+    pkill -f "behavior_server" 2>/dev/null || true
+    pkill -f "controller_server" 2>/dev/null || true
+    pkill -f "planner_server" 2>/dev/null || true
+    pkill -f "bt_navigator" 2>/dev/null || true
+    pkill -f "waypoint_follower" 2>/dev/null || true
+    pkill -f "velocity_smoother" 2>/dev/null || true
+    
+    # Kill SLAM and visualization
+    pkill -f "slam_toolbox" 2>/dev/null || true
+    pkill -f "foxglove_bridge" 2>/dev/null || true
+    
+    # Kill generic ROS launch processes
+    pkill -f "ros2 launch" 2>/dev/null || true
+    
+    # Final sweep: kill all nodes in current ROS_DOMAIN_ID
+    if command -v ros2 &> /dev/null && [ -n "$ROS_DOMAIN_ID" ]; then
+        ros2 node list 2>/dev/null | while read node; do
+            pkill -f "$node" 2>/dev/null || true
+        done
+    fi
+    
+    # Give processes time to die
+    sleep 2
+    
+    print_success "Existing ROS nodes cleaned up"
+}
+
+# ============================================================================
 # Cleanup Handler
 # ============================================================================
 
@@ -1127,6 +1171,11 @@ main() {
     
     # Parse command line arguments
     parse_args "$@"
+    
+    # Clean slate: kill any existing ROS nodes
+    print_section "Pre-Launch Cleanup"
+    kill_all_ros_nodes
+    echo ""
     
     # Run checks and setup
     check_system
