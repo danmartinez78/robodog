@@ -91,7 +91,7 @@ class MissionAgentNode(Node):
             # DIMOS bug: wait_for_server() called before executor starts spinning
             ros_control = UnitreeROSControl(
                 mock_connection=True,  # Skip Nav2 action server wait (DIMOS bug workaround)
-                disable_video_stream=True  # Temporarily disable to debug init hang
+                disable_video_stream=True,  # Temporarily disable to debug init hang
             )
 
             # Get robot IP from environment (required even for mock mode)
