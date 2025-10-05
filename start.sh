@@ -1083,6 +1083,10 @@ kill_all_ros_nodes() {
     pkill -f "slam_toolbox" 2>/dev/null || true
     pkill -f "foxglove_bridge" 2>/dev/null || true
     
+    # Kill DIMOS-specific nodes
+    pkill -f "pointcloud_aggregator" 2>/dev/null || true
+    pkill -f "tts_node" 2>/dev/null || true
+    
     # Kill generic ROS launch processes
     pkill -f "ros2 launch" 2>/dev/null || true
     
@@ -1140,6 +1144,10 @@ cleanup() {
     # Kill SLAM and other common nodes
     pkill -f "slam_toolbox" 2>/dev/null || true
     pkill -f "foxglove_bridge" 2>/dev/null || true
+    
+    # Kill DIMOS-specific nodes
+    pkill -f "pointcloud_aggregator" 2>/dev/null || true
+    pkill -f "tts_node" 2>/dev/null || true
     
     # More aggressive: kill any ros2 launch processes
     pkill -f "ros2 launch" 2>/dev/null || true

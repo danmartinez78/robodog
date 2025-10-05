@@ -63,6 +63,10 @@ pkill -f "slam_toolbox" 2>/dev/null && echo "  ✓ slam_toolbox"
 pkill -f "foxglove_bridge" 2>/dev/null && echo "  ✓ foxglove_bridge"
 pkill -f "rviz2" 2>/dev/null && echo "  ✓ rviz2"
 
+# DIMOS-specific nodes
+pkill -f "pointcloud_aggregator" 2>/dev/null && echo "  ✓ pointcloud_aggregator"
+pkill -f "tts_node" 2>/dev/null && echo "  ✓ tts_node"
+
 # Generic ROS2 launch processes
 pkill -f "ros2 launch" 2>/dev/null && echo "  ✓ ros2 launch processes"
 
@@ -80,7 +84,7 @@ sleep 1
 
 echo ""
 echo -e "${BLUE}Remaining ROS2 processes:${NC}"
-remaining=$(ps aux | grep -E "ros2|go2|nav2|slam|rviz2|foxglove" | grep -v grep | grep -v "kill_all_ros")
+remaining=$(ps aux | grep -E "ros2|go2|nav2|slam|rviz2|foxglove|pointcloud|tts_node" | grep -v grep | grep -v "kill_all_ros")
 if [ -z "$remaining" ]; then
     echo -e "${GREEN}  ✓ All clean!${NC}"
 else
