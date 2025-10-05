@@ -221,8 +221,9 @@ class MissionAgentNode(Node):
                         "OPENAI_API_KEY not set, agent may not function"
                     )
 
+                # OpenAIAgent doesn't take 'robot' parameter directly
+                # Robot is accessed through the skills library
                 self.agent = OpenAIAgent(
-                    robot=self.robot,
                     dev_name="shadowhound",
                     agent_type="Mission",
                     skills=self.skills,
