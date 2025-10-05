@@ -376,6 +376,7 @@ check_dependencies() {
     python3 -c "import reactivex" 2>/dev/null || missing+=("reactivex (DIMOS)")
     python3 -c "import zmq" 2>/dev/null || missing+=("pyzmq (DIMOS)")
     python3 -c "import sounddevice" 2>/dev/null || missing+=("sounddevice (DIMOS)")
+    python3 -c "import rxpy_backpressure" 2>/dev/null || missing+=("rxpy-backpressure (DIMOS)")
     
     if [ ${#missing[@]} -gt 0 ]; then
         print_warning "Missing Python packages: ${missing[*]}"
@@ -384,21 +385,28 @@ check_dependencies() {
         if [[ "$install_choice" != "n" && "$install_choice" != "N" ]]; then
             print_info "Installing Python packages (this may take a few minutes)..."
             
-            # Install all DIMOS base dependencies at once (skip CUDA/perception heavy stuff)
-            print_info "Installing comprehensive DIMOS dependencies..."
-            pip3 install -q \
-                fastapi uvicorn websockets pydantic \
-                openai anthropic tiktoken \
-                reactivex python-dotenv \
-                colorlog typeguard \
-                empy catkin_pkg lark \
-                Flask python-multipart \
-                pytest-asyncio asyncio \
-                sse-starlette \
-                langchain-chroma langchain-openai \
-                pyzmq numpy opencv-python \
-                ffmpeg-python sounddevice pyaudio \
-                requests wasmtime soundfile
+            # Install all DIMOS base dependencies from requirements file
+            if [ -f ".dimos-base-requirements.txt" ]; then
+                print_info "Installing comprehensive DIMOS dependencies from requirements..."
+                pip3 install -q -r .dimos-base-requirements.txt
+            else
+                # Fallback to manual list if requirements file missing
+                print_warning "Requirements file not found, using fallback install"
+                pip3 install -q \
+                    fastapi uvicorn websockets pydantic \
+                    openai anthropic tiktoken \
+                    reactivex python-dotenv \
+                    colorlog typeguard \
+                    empy catkin_pkg lark \
+                    Flask python-multipart \
+                    pytest-asyncio asyncio \
+                    sse-starlette \
+                    langchain-chroma langchain-openai \
+                    pyzmq numpy opencv-python \
+                    ffmpeg-python sounddevice pyaudio \
+                    requests wasmtime soundfile \
+                    git+https://github.com/dimensionalOS/rxpy-backpressure.git
+            fi
             
             print_success "Packages installed"
         else
