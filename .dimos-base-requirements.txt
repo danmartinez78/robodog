@@ -54,7 +54,7 @@ filterpy>=1.4.5
 scipy>=1.15.1
 scikit-learn
 mmengine>=0.10.3
-mmcv>=2.1.0
+# mmcv>=2.1.0  # DISABLED: Requires CUDA compilation, use mmcv-lite or skip
 timm>=1.0.15
 lap>=0.5.12
 # xformers==0.0.20 - Skipped (CUDA-specific, causes issues on CPU-only systems)
