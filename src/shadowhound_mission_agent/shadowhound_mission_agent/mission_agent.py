@@ -67,10 +67,10 @@ class MissionAgentNode(Node):
         # Initialize robot interface
         self.get_logger().info("Initializing robot interface...")
         try:
-            # Disable costmap for development (not needed without nav stack)
+            # Initialize ROS control
+            # Note: Costmap topic will be provided by go2_robot_sdk launch
             ros_control = UnitreeROSControl(
-                mock_connection=self.mock_robot,
-                costmap_topic=""  # Disable costmap - not needed for basic operation
+                mock_connection=self.mock_robot
             )
 
             # Get robot IP from environment (required even for mock mode)
