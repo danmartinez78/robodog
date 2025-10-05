@@ -58,22 +58,33 @@ class TopicDiagnostics(Node):
 
         # Check for specific critical topics
         critical_topics = {
-            "/go2_states": "Robot state data (30Hz)",
-            "/camera/image_raw": "Camera feed (15Hz)",
-            "/imu": "IMU data",
-            "/odom": "Odometry",
-            "/local_costmap/costmap": "Local costmap (Nav2)",
-            "/cmd_vel_out": "Velocity commands",
+            "/go2_states": ("Robot state data (30Hz)", True),
+            "/camera/image_raw": ("Camera feed (15Hz)", True),
+            "/imu": ("IMU data", True),
+            "/odom": ("Odometry", True),
+            "/cmd_vel_out": ("Velocity commands", True),
+        }
+        
+        optional_topics = {
+            "/local_costmap/costmap": ("Local costmap (Nav2, updates on movement)", False),
+            "/global_costmap/costmap": ("Global costmap (Nav2, updates on movement)", False),
         }
 
         print("🎯 Critical topic status:")
-        all_found = True
-        for topic, description in critical_topics.items():
+        all_critical_found = True
+        for topic, (description, required) in critical_topics.items():
             found = any(name == topic for name, _ in topic_names_and_types)
             status = "✅" if found else "❌"
             print(f"  {status} {topic:<30} {description}")
-            if not found:
-                all_found = False
+            if not found and required:
+                all_critical_found = False
+        
+        print()
+        print("📍 Optional topics (may appear on movement):")
+        for topic, (description, _) in optional_topics.items():
+            found = any(name == topic for name, _ in topic_names_and_types)
+            status = "✅" if found else "⚪"
+            print(f"  {status} {topic:<30} {description}")
 
         print()
 
@@ -104,7 +115,7 @@ class TopicDiagnostics(Node):
         print()
         print("=" * 70)
 
-        if all_found:
+        if all_critical_found:
             print("✅ ALL CRITICAL TOPICS FOUND - Ready for mission agent!")
         else:
             print("⚠️  SOME CRITICAL TOPICS MISSING")
