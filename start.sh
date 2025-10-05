@@ -16,6 +16,8 @@
 #   --mock         Force mock robot mode
 #   --no-web       Disable web interface
 #   --web-port N   Set web port (default: 8080)
+#   --skip-update  Skip git repository update check
+#   --auto-update  Automatically pull updates without prompting
 #   --help         Show this help message
 #
 # Examples:
@@ -23,6 +25,8 @@
 #   ./start.sh --dev              # Development mode
 #   ./start.sh --prod --no-web    # Production without web UI
 #   ./start.sh --mock             # Mock robot mode
+#   ./start.sh --auto-update      # Auto-pull latest changes
+#   ./start.sh --skip-update      # Don't check for updates
 #
 # ============================================================================
 
@@ -54,6 +58,8 @@ MOCK_ROBOT=""
 WEB_INTERFACE=""
 WEB_PORT=""
 CONFIG_MODE=""
+SKIP_UPDATE=false
+AUTO_UPDATE=false
 
 # ============================================================================
 # Helper Functions
@@ -114,6 +120,14 @@ parse_args() {
             --web-port)
                 WEB_PORT="$2"
                 shift 2
+                ;;
+            --skip-update)
+                SKIP_UPDATE=true
+                shift
+                ;;
+            --auto-update)
+                AUTO_UPDATE=true
+                shift
                 ;;
             --help|-h)
                 grep '^#' "$0" | grep -v '#!/bin/bash' | sed 's/^# //' | sed 's/^#//'
@@ -194,6 +208,168 @@ check_system() {
         print_error "System checks failed. Please fix the issues above."
         exit 1
     fi
+}
+
+# ============================================================================
+# Git Repository Updates
+# ============================================================================
+
+check_git_updates() {
+    # Skip if requested
+    if [ "$SKIP_UPDATE" = true ]; then
+        print_info "Skipping repository update check (--skip-update flag)"
+        return 0
+    fi
+    
+    print_section "Repository Update Check"
+    
+    local updates_available=false
+    local current_branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "unknown")
+    
+    print_info "Current branch: $current_branch"
+    
+    # Fetch latest from remote (without pulling)
+    print_info "Checking for updates from remote..."
+    if git fetch origin 2>&1 | grep -q "error\|fatal"; then
+        print_warning "Could not fetch from remote (network issue or no remote)"
+        return 0
+    fi
+    
+    # Check main repo for updates
+    local local_commit=$(git rev-parse HEAD 2>/dev/null)
+    local remote_commit=$(git rev-parse origin/$current_branch 2>/dev/null)
+    
+    if [ "$local_commit" != "$remote_commit" ]; then
+        updates_available=true
+        local ahead=$(git rev-list --count origin/$current_branch..HEAD 2>/dev/null || echo "0")
+        local behind=$(git rev-list --count HEAD..origin/$current_branch 2>/dev/null || echo "0")
+        
+        if [ "$behind" -gt 0 ]; then
+            print_warning "Main repo is $behind commit(s) behind remote"
+            echo "  Latest changes:"
+            git log --oneline HEAD..origin/$current_branch | head -3 | sed 's/^/    /'
+        fi
+        
+        if [ "$ahead" -gt 0 ]; then
+            print_info "Main repo has $ahead unpushed commit(s)"
+        fi
+    else
+        print_success "Main repo is up to date"
+    fi
+    
+    # Check submodules for updates
+    print_info "Checking submodules..."
+    
+    if [ -f ".gitmodules" ]; then
+        # Update submodule references
+        git submodule update --init --remote 2>/dev/null || true
+        
+        # Check each submodule
+        git submodule foreach --quiet '
+            submodule_name=$(basename "$sm_path")
+            local_commit=$(git rev-parse HEAD 2>/dev/null)
+            
+            # Fetch updates
+            git fetch origin 2>/dev/null || exit 0
+            
+            current_branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null)
+            remote_commit=$(git rev-parse origin/$current_branch 2>/dev/null)
+            
+            if [ "$local_commit" != "$remote_commit" ]; then
+                behind=$(git rev-list --count HEAD..origin/$current_branch 2>/dev/null || echo "0")
+                if [ "$behind" -gt 0 ]; then
+                    echo "⚠️  $submodule_name: $behind commit(s) behind"
+                    git log --oneline HEAD..origin/$current_branch | head -2 | sed "s/^/      /"
+                fi
+            else
+                echo "✓ $submodule_name: up to date"
+            fi
+        ' | sed 's/^/  /'
+    fi
+    
+    echo ""
+    
+    # Prompt to update if needed
+    if [ "$updates_available" = true ]; then
+        echo ""
+        print_warning "Updates are available!"
+        echo ""
+        
+        if [ "$AUTO_UPDATE" = true ]; then
+            print_info "Auto-updating (--auto-update flag)..."
+            pull_updates
+        else
+            read -p "Pull latest changes from remote? [Y/n]: " pull_choice
+            
+            if [[ "$pull_choice" != "n" && "$pull_choice" != "N" ]]; then
+                pull_updates
+            else
+                print_info "Skipping updates (you can run 'git pull' manually later)"
+            fi
+        fi
+    fi
+}
+
+pull_updates() {
+    print_info "Pulling latest changes..."
+    
+    # Check for uncommitted changes
+    if ! git diff-index --quiet HEAD -- 2>/dev/null; then
+        print_warning "You have uncommitted changes"
+        echo ""
+        git status --short
+        echo ""
+        read -p "Stash changes before pulling? [Y/n]: " stash_choice
+        
+        if [[ "$stash_choice" != "n" && "$stash_choice" != "N" ]]; then
+            git stash push -m "Auto-stash by start.sh at $(date)"
+            print_success "Changes stashed"
+            local stashed=true
+        else
+            print_error "Cannot pull with uncommitted changes"
+            print_info "Either commit, stash, or discard your changes first"
+            exit 1
+        fi
+    fi
+    
+    # Pull main repo
+    if git pull origin $current_branch; then
+        print_success "Main repo updated"
+    else
+        print_error "Failed to pull main repo"
+        if [ "$stashed" = true ]; then
+            print_info "Your changes are stashed. Run 'git stash pop' to restore them."
+        fi
+        exit 1
+    fi
+    
+    # Update submodules
+    print_info "Updating submodules..."
+    if git submodule update --remote --merge; then
+        print_success "Submodules updated"
+    else
+        print_warning "Some submodules may not have updated successfully"
+    fi
+    
+    # Pop stash if we stashed
+    if [ "$stashed" = true ]; then
+        echo ""
+        read -p "Restore your stashed changes? [Y/n]: " pop_choice
+        if [[ "$pop_choice" != "n" && "$pop_choice" != "N" ]]; then
+            if git stash pop; then
+                print_success "Changes restored"
+            else
+                print_warning "Conflicts restoring changes - run 'git stash pop' manually"
+            fi
+        else
+            print_info "Changes remain stashed - run 'git stash pop' when ready"
+        fi
+    fi
+    
+    # Suggest rebuild if code changed
+    echo ""
+    print_warning "Code was updated - rebuild recommended"
+    FORCE_REBUILD=true
 }
 
 # ============================================================================
@@ -309,7 +485,7 @@ build_workspace() {
     print_section "Building Workspace"
     
     # Check if already built
-    if [ -d "install" ] && [ -f "install/setup.bash" ]; then
+    if [ -d "install" ] && [ -f "install/setup.bash" ] && [ "$FORCE_REBUILD" != "true" ]; then
         # Check if launch files are installed
         if [ ! -f "install/shadowhound_mission_agent/share/shadowhound_mission_agent/launch/mission_agent.launch.py" ]; then
             print_warning "Launch files not installed, rebuild required"
@@ -320,6 +496,10 @@ build_workspace() {
                 return 0
             fi
         fi
+    fi
+    
+    if [ "$FORCE_REBUILD" = "true" ]; then
+        print_info "Code was updated - rebuilding workspace"
     fi
     
     print_info "Building ShadowHound packages..."
@@ -550,6 +730,7 @@ main() {
     
     # Run checks and setup
     check_system
+    check_git_updates  # NEW: Check for repo/submodule updates
     setup_config
     build_workspace
     check_dependencies
