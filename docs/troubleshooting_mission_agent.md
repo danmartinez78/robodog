@@ -87,10 +87,22 @@ parameters=[{
 4. Verify ROS executor is spinning during initialization
 5. Check for any hidden topic subscriptions (transforms, etc.)
 
-## Latest Finding (2025-10-04)
-Mission agent logs show `ROSVideoProvider initialized` even with `disable_video_stream=False`. 
-The UnitreeGo2.__init__ creates video streams and tracking streams which might be hanging.
-Need to test with `disable_video_stream=True` to isolate the issue.
+## Latest Finding (2025-10-04 21:35)
+**ROOT CAUSE IDENTIFIED**: Mission agent hangs at `self._spin_client.wait_for_server()` in ROSControl.__init__
+
+The initialization is blocking while waiting for Nav2's `/spin` action server to become available.
+With `mock_robot:=false`, DIMOS tries to connect to Nav2 action servers.
+
+Location: `src/dimos-unitree/dimos/robot/ros_control.py:236`
+```python
+if not mock_connection:
+    self._spin_client.wait_for_server()  # <-- BLOCKS HERE
+```
+
+**Quick Fix Options**:
+1. Ensure Nav2 spin action server is running: `ros2 action list | grep spin`
+2. Temporarily use `mock_connection=True` in ROSControl (skips Nav2 connection)
+3. Remove/timeout the `wait_for_server()` call
 
 ## Commands for Testing
 

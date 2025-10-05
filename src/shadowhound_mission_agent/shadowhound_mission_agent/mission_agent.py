@@ -1,5 +1,23 @@
 #!/usr/bin/env python3
-"""ShadowHound Mission Agent - Integrates DIMOS agents with ROS2.
+"""ShadowHound Mission Agent - Integrates DIM        try:
+            # Initialize ROS control
+            # Note: Costmap topic will be provided by go2_robot_sdk launch
+            # WORKAROUND: Use mock_connection=True to skip wait_for_server() hang
+            # DIMOS bug: wait_for_server() called before executor starts spinning
+            ros_control = UnitreeROSControl(
+                mock_connection=True,  # Skip Nav2 action server wait (DIMOS bug workaround)
+                disable_video_stream=True  # Temporarily disable to debug init hang
+            )
+
+            # Get robot IP from environment (required even for mock mode)
+            robot_ip = os.getenv("GO2_IP", "192.168.1.103")
+
+            self.robot = UnitreeGo2(
+                ros_control=ros_control,
+                ip=robot_ip,  # Required for WebRTC connection
+                mock_connection=True,  # Skip Nav2 action server wait (DIMOS bug workaround)
+                disable_video_stream=True,  # Temporarily disable to debug init hang
+            )2.
 
 This node provides a ROS2 interface to DIMOS agents for autonomous mission execution.
 It bridges natural language commands with the robot's skill execution system.
@@ -69,9 +87,10 @@ class MissionAgentNode(Node):
         try:
             # Initialize ROS control
             # Note: Costmap topic will be provided by go2_robot_sdk launch
-            # Disable video stream completely to isolate initialization issue
+            # WORKAROUND: Use mock_connection=True to skip wait_for_server() hang
+            # DIMOS bug: wait_for_server() called before executor starts spinning
             ros_control = UnitreeROSControl(
-                mock_connection=self.mock_robot,
+                mock_connection=True,  # Skip Nav2 action server wait (DIMOS bug workaround)
                 disable_video_stream=True  # Temporarily disable to debug init hang
             )
 
@@ -81,7 +100,7 @@ class MissionAgentNode(Node):
             self.robot = UnitreeGo2(
                 ros_control=ros_control,
                 ip=robot_ip,  # Required for WebRTC connection
-                mock_connection=self.mock_robot,  # Pass mock flag to UnitreeGo2
+                mock_connection=True,  # Skip Nav2 action server wait (DIMOS bug workaround)
                 disable_video_stream=True,  # Temporarily disable to debug init hang
             )
             self.get_logger().info(
