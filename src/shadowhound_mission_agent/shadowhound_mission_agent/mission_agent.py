@@ -89,9 +89,8 @@ class MissionAgentNode(Node):
         self.get_logger().info("Initializing robot interface...")
         try:
             # Initialize ROS control
-            # Note: Disable costmap subscription during init - costmaps only publish when robot moves
-            # Planners will wait for costmap data when needed during actual navigation
-            ros_control = UnitreeROSControl(costmap_topic=None)
+            # Costmap topic uses Nav2's default which publishes to /local_costmap/costmap
+            ros_control = UnitreeROSControl()
 
             # Get robot IP from environment
             robot_ip = os.getenv("GO2_IP", "192.168.1.103")

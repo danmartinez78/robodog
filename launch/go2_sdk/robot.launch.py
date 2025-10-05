@@ -70,10 +70,9 @@ class Go2LaunchConfig:
         """Get all configuration file paths"""
         # Use custom configs from shadowhound workspace where available
         shadowhound_config_dir = os.path.join(
-            os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
-            "config"
+            os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "config"
         )
-        
+
         return {
             "joystick": os.path.join(self.package_dir, "config", "joystick.yaml"),
             "twist_mux": os.path.join(self.package_dir, "config", "twist_mux.yaml"),
@@ -81,9 +80,13 @@ class Go2LaunchConfig:
                 self.package_dir, "config", "mapper_params_online_async.yaml"
             ),
             # Use custom nav2 config from shadowhound workspace if it exists
-            "nav2": os.path.join(shadowhound_config_dir, "nav2_params.yaml")
-                    if os.path.exists(os.path.join(shadowhound_config_dir, "nav2_params.yaml"))
-                    else os.path.join(self.package_dir, "config", "nav2_params.yaml"),
+            "nav2": (
+                os.path.join(shadowhound_config_dir, "nav2_params.yaml")
+                if os.path.exists(
+                    os.path.join(shadowhound_config_dir, "nav2_params.yaml")
+                )
+                else os.path.join(self.package_dir, "config", "nav2_params.yaml")
+            ),
             "rviz": os.path.join(self.package_dir, "config", self.rviz_config),
             "urdf": os.path.join(self.package_dir, "urdf", self.urdf_file),
         }

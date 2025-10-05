@@ -1,0 +1,20 @@
+--- a/src/dimos-unitree/dimos/robot/unitree/unitree_go2.py
++++ b/src/dimos-unitree/dimos/robot/unitree/unitree_go2.py
+@@ -164,7 +164,7 @@ class UnitreeGo2(Robot):
+ 
+         # Initialize the local planner and create BEV visualization stream
+         self.local_planner = VFHPurePursuitPlanner(
+-            get_costmap=self.ros_control.topic_latest("/local_costmap/costmap", Costmap),
++            get_costmap=self.ros_control.topic_latest("/local_costmap/costmap", Costmap, timeout=None),
+             transform=self.ros_control,
+             move_vel_control=self.ros_control.move_vel_control,
+             robot_width=0.36,  # Unitree Go2 width in meters
+@@ -177,7 +177,7 @@ class UnitreeGo2(Robot):
+         self.global_planner = AstarPlanner(
+             conservativism=20,  # how close to obstacles robot is allowed to path plan
+             set_local_nav=lambda path, stop_event=None, goal_theta=None: navigate_path_local(self, path, timeout=120.0, goal_theta=goal_theta, stop_event=stop_event),
+-            get_costmap=self.ros_control.topic_latest("map", Costmap),
++            get_costmap=self.ros_control.topic_latest("map", Costmap, timeout=None),
+             get_robot_pos=lambda: self.ros_control.transform_euler_pos("base_link"),
+         )
+ 
