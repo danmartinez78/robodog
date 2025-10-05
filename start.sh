@@ -623,15 +623,19 @@ check_dependencies() {
             
             # Install mmcv separately (requires specific index for pre-built wheels)
             if [[ " ${missing[*]} " =~ " mmcv " ]]; then
-                print_info "Installing mmcv from OpenMMLab (CPU version)..."
-                # Detect PyTorch version
-                local torch_version=$(python3 -c "import torch; print(torch.__version__.split('+')[0])" 2>/dev/null || echo "2.0.0")
-                local torch_major_minor=$(echo $torch_version | cut -d. -f1,2)
-                
-                print_info "Detected PyTorch ${torch_version}, using torch${torch_major_minor} index"
-                pip3 install mmcv -f "https://download.openmmlab.com/mmcv/dist/cpu/torch${torch_major_minor}/index.html" || {
-                    print_warning "Failed to install mmcv from OpenMMLab, trying pip (may fail)"
-                    pip3 install mmcv || print_warning "mmcv installation failed - Metric3D depth may not work"
+                print_info "Installing mmcv-lite (pure Python, no CUDA compilation)..."
+                # Try mmcv-lite first (no compilation needed)
+                pip3 install mmcv-lite || {
+                    print_warning "mmcv-lite not available, trying OpenMMLab pre-built wheels..."
+                    # Detect PyTorch version
+                    local torch_version=$(python3 -c "import torch; print(torch.__version__.split('+')[0])" 2>/dev/null || echo "2.0.0")
+                    local torch_major_minor=$(echo $torch_version | cut -d. -f1,2)
+                    
+                    print_info "Detected PyTorch ${torch_version}, using torch${torch_major_minor} index"
+                    pip3 install mmcv -f "https://download.openmmlab.com/mmcv/dist/cpu/torch${torch_major_minor}/index.html" || {
+                        print_warning "mmcv installation failed - Metric3D depth may not work"
+                        print_info "You can try manually: pip install 'openmim' && mim install 'mmcv>=2.0.0'"
+                    }
                 }
             fi
             
