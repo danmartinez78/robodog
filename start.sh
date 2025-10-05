@@ -598,14 +598,19 @@ check_dependencies() {
         if [[ "$install_choice" != "n" && "$install_choice" != "N" ]]; then
             print_info "Installing Python packages (this may take a few minutes)..."
             
+            local install_failed=false
+            
             # Install all DIMOS base dependencies from requirements file
             if [ -f ".dimos-base-requirements.txt" ]; then
                 print_info "Installing comprehensive DIMOS dependencies from requirements..."
-                pip3 install -q -r .dimos-base-requirements.txt
+                if ! pip3 install -q -r .dimos-base-requirements.txt; then
+                    print_error "Failed to install some dependencies from requirements file"
+                    install_failed=true
+                fi
             else
                 # Fallback to manual list if requirements file missing
                 print_warning "Requirements file not found, using fallback install"
-                pip3 install -q \
+                if ! pip3 install -q \
                     fastapi uvicorn websockets pydantic \
                     openai anthropic tiktoken \
                     reactivex python-dotenv \
@@ -618,28 +623,42 @@ check_dependencies() {
                     pyzmq numpy opencv-python \
                     ffmpeg-python sounddevice pyaudio \
                     requests wasmtime soundfile \
-                    git+https://github.com/dimensionalOS/rxpy-backpressure.git
+                    git+https://github.com/dimensionalOS/rxpy-backpressure.git; then
+                    print_error "Failed to install some dependencies"
+                    install_failed=true
+                fi
             fi
             
             # Install mmcv separately (requires specific index for pre-built wheels)
             if [[ " ${missing[*]} " =~ " mmcv " ]]; then
                 print_info "Installing mmcv-lite (pure Python, no CUDA compilation)..."
                 # Try mmcv-lite first (no compilation needed)
-                pip3 install mmcv-lite || {
+                if ! pip3 install mmcv-lite; then
                     print_warning "mmcv-lite not available, trying OpenMMLab pre-built wheels..."
                     # Detect PyTorch version
                     local torch_version=$(python3 -c "import torch; print(torch.__version__.split('+')[0])" 2>/dev/null || echo "2.0.0")
                     local torch_major_minor=$(echo $torch_version | cut -d. -f1,2)
                     
                     print_info "Detected PyTorch ${torch_version}, using torch${torch_major_minor} index"
-                    pip3 install mmcv -f "https://download.openmmlab.com/mmcv/dist/cpu/torch${torch_major_minor}/index.html" || {
-                        print_warning "mmcv installation failed - Metric3D depth may not work"
+                    if ! pip3 install mmcv -f "https://download.openmmlab.com/mmcv/dist/cpu/torch${torch_major_minor}/index.html"; then
+                        print_error "mmcv installation failed - Metric3D depth will not work"
                         print_info "You can try manually: pip install 'openmim' && mim install 'mmcv>=2.0.0'"
-                    }
-                }
+                        install_failed=true
+                    fi
+                fi
             fi
             
-            print_success "Packages installed"
+            if [ "$install_failed" = true ]; then
+                print_error "Some packages failed to install"
+                read -p "Continue anyway? (System may not work correctly) [y/N]: " continue_choice
+                if [[ "$continue_choice" != "y" && "$continue_choice" != "Y" ]]; then
+                    print_info "Exiting. Fix dependency issues and try again"
+                    exit 1
+                fi
+                print_warning "Continuing with missing dependencies - expect errors"
+            else
+                print_success "All packages installed successfully"
+            fi
         else
             print_warning "Some features may not work without these packages"
         fi
