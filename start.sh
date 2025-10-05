@@ -365,25 +365,31 @@ check_dependencies() {
     python3 -c "import openai" 2>/dev/null || missing+=("openai")
     python3 -c "import rclpy" 2>/dev/null || missing+=("ROS2 Python")
     python3 -c "import reactivex" 2>/dev/null || missing+=("reactivex (DIMOS)")
-    python3 -c "import anthropic" 2>/dev/null || missing+=("anthropic (DIMOS)")
     python3 -c "import zmq" 2>/dev/null || missing+=("pyzmq (DIMOS)")
+    python3 -c "import sounddevice" 2>/dev/null || missing+=("sounddevice (DIMOS)")
     
     if [ ${#missing[@]} -gt 0 ]; then
         print_warning "Missing Python packages: ${missing[*]}"
         read -p "Install missing packages? [Y/n]: " install_choice
         
         if [[ "$install_choice" != "n" && "$install_choice" != "N" ]]; then
-            print_info "Installing Python packages..."
+            print_info "Installing Python packages (this may take a few minutes)..."
             
-            # Install ShadowHound dependencies
-            pip3 install -q fastapi uvicorn[standard] websockets pydantic openai
-            
-            # Install DIMOS core dependencies (skip heavy perception/CUDA stuff)
-            print_info "Installing DIMOS core dependencies..."
-            pip3 install -q reactivex python-dotenv anthropic colorlog typeguard \
-                empy catkin_pkg lark tiktoken Flask python-multipart pytest-asyncio \
-                fastapi sse-starlette uvicorn langchain-chroma langchain-openai pydantic \
-                pyzmq numpy
+            # Install all DIMOS base dependencies at once (skip CUDA/perception heavy stuff)
+            print_info "Installing comprehensive DIMOS dependencies..."
+            pip3 install -q \
+                fastapi uvicorn websockets pydantic \
+                openai anthropic tiktoken \
+                reactivex python-dotenv \
+                colorlog typeguard \
+                empy catkin_pkg lark \
+                Flask python-multipart \
+                pytest-asyncio asyncio \
+                sse-starlette \
+                langchain-chroma langchain-openai \
+                pyzmq numpy opencv-python \
+                ffmpeg-python sounddevice pyaudio \
+                requests wasmtime soundfile
             
             print_success "Packages installed"
         else
