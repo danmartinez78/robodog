@@ -364,6 +364,8 @@ check_dependencies() {
     python3 -c "import uvicorn" 2>/dev/null || missing+=("uvicorn")
     python3 -c "import openai" 2>/dev/null || missing+=("openai")
     python3 -c "import rclpy" 2>/dev/null || missing+=("ROS2 Python")
+    python3 -c "import reactivex" 2>/dev/null || missing+=("reactivex (DIMOS)")
+    python3 -c "import anthropic" 2>/dev/null || missing+=("anthropic (DIMOS)")
     
     if [ ${#missing[@]} -gt 0 ]; then
         print_warning "Missing Python packages: ${missing[*]}"
@@ -371,7 +373,16 @@ check_dependencies() {
         
         if [[ "$install_choice" != "n" && "$install_choice" != "N" ]]; then
             print_info "Installing Python packages..."
-            pip3 install fastapi uvicorn[standard] websockets pydantic openai
+            
+            # Install ShadowHound dependencies
+            pip3 install -q fastapi uvicorn[standard] websockets pydantic openai
+            
+            # Install DIMOS core dependencies (skip heavy perception/CUDA stuff)
+            print_info "Installing DIMOS core dependencies..."
+            pip3 install -q reactivex python-dotenv anthropic colorlog typeguard \
+                empy catkin_pkg lark tiktoken Flask python-multipart pytest-asyncio \
+                fastapi sse-starlette uvicorn langchain-chroma langchain-openai pydantic
+            
             print_success "Packages installed"
         else
             print_warning "Some features may not work without these packages"
