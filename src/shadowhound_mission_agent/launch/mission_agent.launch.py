@@ -10,15 +10,14 @@ from launch_ros.actions import Node
 
 def generate_launch_description():
     """Generate launch description for mission agent."""
-    
+
     # Get DIMOS path (assuming it's in the workspace)
     workspace_dir = Path(__file__).resolve().parents[3]  # Go up to workspace root
     dimos_path = workspace_dir / "src" / "dimos-unitree"
-    
+
     # Set PYTHONPATH to include DIMOS
     pythonpath_env = SetEnvironmentVariable(
-        "PYTHONPATH",
-        str(dimos_path) + os.pathsep + os.environ.get("PYTHONPATH", "")
+        "PYTHONPATH", str(dimos_path) + os.pathsep + os.environ.get("PYTHONPATH", "")
     )
 
     # Declare launch arguments
