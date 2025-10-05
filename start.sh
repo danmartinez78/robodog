@@ -572,6 +572,7 @@ check_dependencies() {
     python3 -c "import ultralytics" 2>/dev/null || missing+=("ultralytics (DIMOS perception)")
     python3 -c "import filterpy" 2>/dev/null || missing+=("filterpy (DIMOS perception)")
     python3 -c "import transformers" 2>/dev/null || missing+=("transformers (DIMOS vision)")
+    python3 -c "import mmengine" 2>/dev/null || missing+=("mmengine (Metric3D depth)")
     
     if [ ${#missing[@]} -gt 0 ]; then
         print_warning "Missing Python packages: ${missing[*]}"
