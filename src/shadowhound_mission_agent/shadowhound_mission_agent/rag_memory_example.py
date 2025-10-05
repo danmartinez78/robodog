@@ -266,7 +266,7 @@ def _init_agent_with_rag(self):
     # Initialize robot and skills (your existing code)
     ros_control = UnitreeROSControl(mock_connection=self.mock_robot)
     self.robot = UnitreeGo2(ros_control=ros_control, disable_video_stream=True)
-    self.skills = UnitreeSkills(robot=self.robot)
+    self.skills = MyUnitreeSkills(robot=self.robot)
 
     # Create agent WITH RAG memory
     from dimos.agents.agent import OpenAIAgent

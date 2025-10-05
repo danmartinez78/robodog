@@ -19,7 +19,7 @@ try:
     from dimos.agents.planning_agent import PlanningAgent
     from dimos.robot.unitree.unitree_go2 import UnitreeGo2
     from dimos.robot.unitree.unitree_ros_control import UnitreeROSControl
-    from dimos.robot.unitree.unitree_skills import UnitreeSkills
+    from dimos.robot.unitree.unitree_skills import MyUnitreeSkills
     from dimos.skills.skills import SkillLibrary
 
     DIMOS_AVAILABLE = True
@@ -79,7 +79,7 @@ class MissionAgentNode(Node):
 
         # Initialize skill library
         self.get_logger().info("Initializing skill library...")
-        self.skills = UnitreeSkills(robot=self.robot)
+        self.skills = MyUnitreeSkills(robot=self.robot)
         self.get_logger().info(f"Loaded {len(self.skills.get())} skills")
 
         # Initialize agent
