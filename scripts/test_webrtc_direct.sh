@@ -39,9 +39,9 @@ if [ ! -f "$TEST_ENV" ]; then
     echo "Creating default .env.webrtc_test file..."
     cat > "$TEST_ENV" << 'EOF'
 # WebRTC Test Environment
-# UPDATE GO2_IP with your robot's WiFi IP address!
+# UPDATE ROBOT_IP with your robot's WiFi IP address!
 
-GO2_IP=192.168.1.103
+ROBOT_IP=192.168.1.103
 CONN_TYPE=webrtc
 ROS_DOMAIN_ID=0
 RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
@@ -53,6 +53,8 @@ EOF
     echo ""
     echo "Find your robot's WiFi IP in the Unitree app:"
     echo "  Settings → Network Settings → WiFi IP"
+    echo ""
+    echo "Then run this script again."
     echo ""
     exit 1
 fi
@@ -76,27 +78,24 @@ fi
 
 # Set WebRTC mode
 export CONN_TYPE=webrtc
-export GO2_IP=${GO2_IP:-192.168.1.103}
-# SDK uses ROBOT_IP internally, so export it from GO2_IP
-export ROBOT_IP=$GO2_IP
+export ROBOT_IP=${ROBOT_IP:-192.168.1.103}
 
 echo -e "${YELLOW}Configuration:${NC}"
 echo "  • CONN_TYPE: $CONN_TYPE"
-echo "  • GO2_IP: $GO2_IP (robot WiFi address)"
-echo "  • ROBOT_IP: $ROBOT_IP (for SDK compatibility)"
+echo "  • ROBOT_IP: $ROBOT_IP (robot WiFi address)"
 echo ""
 
 # Verify robot connectivity
 echo -e "${BLUE}[1/4] Verifying robot connectivity...${NC}"
-if ping -c 2 -W 2 "$GO2_IP" &> /dev/null; then
-    echo -e "${GREEN}✓ Robot reachable at $GO2_IP${NC}"
+if ping -c 2 -W 2 "$ROBOT_IP" &> /dev/null; then
+    echo -e "${GREEN}✓ Robot reachable at $ROBOT_IP${NC}"
 else
-    echo -e "${RED}✗ Cannot reach robot at $GO2_IP${NC}"
+    echo -e "${RED}✗ Cannot reach robot at $ROBOT_IP${NC}"
     echo ""
     echo "Troubleshooting:"
     echo "  1. Is robot powered on?"
     echo "  2. Is robot connected to WiFi?"
-    echo "  3. Is GO2_IP correct? (check in Unitree app)"
+    echo "  3. Is ROBOT_IP correct? (check in Unitree app)"
     echo ""
     read -p "Continue anyway? [y/N]: " choice
     if [[ "$choice" != "y" && "$choice" != "Y" ]]; then

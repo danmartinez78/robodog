@@ -461,7 +461,7 @@ setup_config() {
         echo "Minimum required:"
         echo "  - OPENAI_API_KEY=sk-your-key-here"
         if [ "$CONFIG_MODE" = "production" ]; then
-            echo "  - GO2_IP=192.168.1.103 (your robot's IP)"
+            echo "  - ROBOT_IP=192.168.1.103 (your robot's IP)"
         fi
         echo ""
         read -p "Open .env for editing now? [Y/n]: " edit_choice
@@ -497,10 +497,10 @@ setup_config() {
         print_info "Using MOCK robot mode (no hardware needed)"
     else
         print_info "Using REAL robot mode"
-        if [ -z "$GO2_IP" ]; then
-            print_warning "GO2_IP not set, using default: 192.168.1.103"
+        if [ -z "$ROBOT_IP" ]; then
+            print_warning "ROBOT_IP not set, using default: 192.168.1.103"
         else
-            print_success "Robot IP: $GO2_IP"
+            print_success "Robot IP: $ROBOT_IP"
         fi
     fi
 }

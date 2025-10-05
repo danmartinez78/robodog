@@ -62,7 +62,11 @@ echo ""
 # Try to detect current IP from main .env
 CURRENT_IP=""
 if [ -f ".env" ]; then
-    CURRENT_IP=$(grep "^GO2_IP=" .env 2>/dev/null | cut -d= -f2)
+    CURRENT_IP=$(grep "^ROBOT_IP=" .env 2>/dev/null | cut -d= -f2)
+    # Fallback to GO2_IP for backward compatibility
+    if [ -z "$CURRENT_IP" ]; then
+        CURRENT_IP=$(grep "^GO2_IP=" .env 2>/dev/null | cut -d= -f2)
+    fi
 fi
 
 if [ -n "$CURRENT_IP" ]; then
@@ -133,7 +137,7 @@ cat > "$ENV_FILE" << EOF
 # ----------------------------------------------------------------------------
 
 # Robot WiFi IP address
-GO2_IP=$robot_ip
+ROBOT_IP=$robot_ip
 
 # Connection type - MUST be webrtc for this test
 CONN_TYPE=webrtc
