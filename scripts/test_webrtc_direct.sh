@@ -22,13 +22,17 @@ BLUE='\033[0;34m'
 RED='\033[0;31m'
 NC='\033[0m'
 
+# Script directory
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR/.."
+
 echo -e "${BLUE}╔════════════════════════════════════════════════════════════════╗${NC}"
 echo -e "${BLUE}║  Direct WebRTC Test - go2_ros2_sdk Only                       ║${NC}"
 echo -e "${BLUE}╚════════════════════════════════════════════════════════════════╝${NC}"
 echo ""
 
 # Load test-specific environment file
-TEST_ENV="${SCRIPT_DIR}/.env.webrtc_test"
+TEST_ENV=".env.webrtc_test"
 if [ ! -f "$TEST_ENV" ]; then
     echo -e "${RED}✗ Test environment file not found: $TEST_ENV${NC}"
     echo ""
