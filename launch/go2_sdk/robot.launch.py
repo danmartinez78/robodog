@@ -191,6 +191,18 @@ class Go2NodeFactory:
                     'conn_type': self.config.conn_type
                 }],
             ),
+            # Image republisher to convert raw to compressed
+            Node(
+                package='image_transport',
+                executable='republish',
+                name='image_republisher',
+                arguments=['raw', 'compressed'],
+                remappings=[
+                    ('in', 'camera/image_raw'),
+                    ('out/compressed', 'camera/compressed'),
+                ],
+                output='screen',
+            ),
             # LiDAR processing node (new separate package)
             Node(
                 package='lidar_processor',

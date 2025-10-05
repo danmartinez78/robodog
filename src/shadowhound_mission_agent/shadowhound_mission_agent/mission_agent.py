@@ -69,10 +69,10 @@ class MissionAgentNode(Node):
         try:
             # Initialize ROS control
             # Note: Costmap topic will be provided by go2_robot_sdk launch
-            # Use raw image topic since robot.launch.py publishes /camera/image_raw, not /camera/compressed
+            # robot.launch.py now includes image_republisher to provide /camera/compressed
             ros_control = UnitreeROSControl(
-                mock_connection=self.mock_robot,
-                use_raw=True  # Use /camera/image_raw instead of /camera/compressed
+                mock_connection=self.mock_robot
+                # use_raw=False by default, subscribes to /camera/compressed
             )
 
             # Get robot IP from environment (required even for mock mode)
@@ -82,7 +82,7 @@ class MissionAgentNode(Node):
                 ros_control=ros_control,
                 ip=robot_ip,  # Required for WebRTC connection
                 mock_connection=self.mock_robot,  # Pass mock flag to UnitreeGo2
-                disable_video_stream=False,  # Enable video stream (using raw topic)
+                disable_video_stream=False,  # Enable video stream
             )
             self.get_logger().info(
                 f"Robot initialized (mock={self.mock_robot}, ip={robot_ip})"
