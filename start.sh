@@ -804,12 +804,13 @@ launch_robot_driver() {
     
     print_info "Launching robot driver in background..."
     print_info "Launch file: $robot_launch"
+    print_info "Robot IP: $go2_ip"
     echo ""
     
     # Launch robot driver in background with log file
     # Explicitly enable Nav2 (required for DIMOS /spin action) and RViz2
     local log_file="/tmp/shadowhound_robot_driver.log"
-    ros2 launch "$robot_launch" nav2:=true rviz2:=true > "$log_file" 2>&1 &
+    ros2 launch "$robot_launch" robot_ip:="$go2_ip" nav2:=true rviz2:=true > "$log_file" 2>&1 &
     local driver_pid=$!
     
     print_success "Robot driver launched (PID: $driver_pid)"
