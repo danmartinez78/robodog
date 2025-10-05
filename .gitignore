@@ -5,6 +5,11 @@ build/
 install/
 log/
 
+# Environment configuration
+.env
+.env.local
+*.env.backup
+
 # IDE and editor files
 .vscode/
 *.swp
