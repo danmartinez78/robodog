@@ -793,12 +793,13 @@ launch_robot_driver() {
     # Determine which launch file to use
     local robot_launch="launch/go2_sdk/robot.launch.py"
     if [ ! -f "$robot_launch" ]; then
-        robot_launch="src/dimos-unitree/dimos/robot/unitree/external/go2_ros2_sdk/launch/robot.launch.py"
+        robot_launch="src/dimos-unitree/dimos/robot/unitree/external/go2_ros2_sdk/go2_robot_sdk/launch/robot.launch.py"
     fi
     
     if [ ! -f "$robot_launch" ]; then
         print_error "Robot launch file not found"
         print_info "Expected: launch/go2_sdk/robot.launch.py"
+        print_info "Or: src/dimos-unitree/.../go2_robot_sdk/launch/robot.launch.py"
         return 1
     fi
     
@@ -810,7 +811,7 @@ launch_robot_driver() {
     # Launch robot driver in background with log file
     # Explicitly enable Nav2 (required for DIMOS /spin action) and RViz2
     local log_file="/tmp/shadowhound_robot_driver.log"
-    ros2 launch "$robot_launch" robot_ip:="$go2_ip" nav2:=true rviz2:=true > "$log_file" 2>&1 &
+    ros2 launch "$robot_launch" robot_ip:=$go2_ip nav2:=true rviz2:=true > "$log_file" 2>&1 &
     local driver_pid=$!
     
     print_success "Robot driver launched (PID: $driver_pid)"
