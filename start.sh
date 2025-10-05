@@ -366,6 +366,7 @@ check_dependencies() {
     python3 -c "import rclpy" 2>/dev/null || missing+=("ROS2 Python")
     python3 -c "import reactivex" 2>/dev/null || missing+=("reactivex (DIMOS)")
     python3 -c "import anthropic" 2>/dev/null || missing+=("anthropic (DIMOS)")
+    python3 -c "import zmq" 2>/dev/null || missing+=("pyzmq (DIMOS)")
     
     if [ ${#missing[@]} -gt 0 ]; then
         print_warning "Missing Python packages: ${missing[*]}"
@@ -381,7 +382,8 @@ check_dependencies() {
             print_info "Installing DIMOS core dependencies..."
             pip3 install -q reactivex python-dotenv anthropic colorlog typeguard \
                 empy catkin_pkg lark tiktoken Flask python-multipart pytest-asyncio \
-                fastapi sse-starlette uvicorn langchain-chroma langchain-openai pydantic
+                fastapi sse-starlette uvicorn langchain-chroma langchain-openai pydantic \
+                pyzmq numpy
             
             print_success "Packages installed"
         else
