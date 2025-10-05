@@ -57,7 +57,8 @@ filterpy>=1.4.5
 scipy>=1.15.1
 scikit-learn
 mmengine>=0.10.3  # Required for Metric3D depth estimation
-mmcv>=2.0.0  # Required for Metric3D (CPU version)
+# mmcv - Install separately with: pip install mmcv -f https://download.openmmlab.com/mmcv/dist/cpu/torch2.0/index.html
+# (Requires CUDA-specific build, so we skip in requirements to avoid build failures)
 timm>=1.0.15
 lap>=0.5.12
 # xformers==0.0.20 - Skipped (CUDA-specific, causes issues on CPU-only systems)
