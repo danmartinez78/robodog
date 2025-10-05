@@ -713,6 +713,10 @@ export ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
 export GO2_IP=${GO2_IP:-192.168.10.167}
 export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
 
+# Connection type for Unitree Go2 (cyclonedds for Ethernet, webrtc for WiFi)
+# WebRTC required for DIMOS high-level API commands (sit, stand, wave, etc.)
+export CONN_TYPE=${CONN_TYPE:-webrtc}
+
 # Source ROS2
 if [ -f "/opt/ros/humble/setup.bash" ]; then
     source /opt/ros/humble/setup.bash
@@ -726,16 +730,24 @@ fi
 echo "✓ ShadowHound environment loaded"
 echo "  ROS_DOMAIN_ID: \$ROS_DOMAIN_ID"
 echo "  GO2_IP: \$GO2_IP"
+echo "  CONN_TYPE: \$CONN_TYPE"
 EOF
     
     echo ""
     echo "Configuration:"
     echo "  • Mode: ${CONFIG_MODE:-default}"
     echo "  • Mock Robot: ${MOCK_ROBOT:-false}"
+    echo "  • Connection: ${CONN_TYPE:-webrtc}"
     echo "  • Web Interface: ${WEB_INTERFACE:-true}"
     echo "  • Web Port: ${WEB_PORT:-8080}"
     echo "  • ROS Domain: ${ROS_DOMAIN_ID:-0}"
     echo "  • OpenAI Model: ${OPENAI_MODEL:-gpt-4o}"
+    echo ""
+    if [ "${CONN_TYPE:-webrtc}" = "webrtc" ]; then
+        echo -e "${CYAN}${INFO} WebRTC mode enabled - robot must be on WiFi network${NC}"
+    else
+        echo -e "${YELLOW}${WARN} CycloneDDS mode - high-level API commands (sit/stand/wave) unavailable${NC}"
+    fi
     echo ""
     echo -e "${CYAN}${INFO} To access ROS topics in another terminal, run:${NC}"
     echo -e "${CYAN}    source .shadowhound_env${NC}"
@@ -766,7 +778,8 @@ launch_robot_driver() {
     
     local go2_ip=${GO2_IP:-192.168.10.167}
     
-    # Export ROBOT_IP for the launch file (it reads this env var)
+    # SDK launch file reads ROBOT_IP environment variable
+    # Export ROBOT_IP=$GO2_IP for SDK compatibility
     export ROBOT_IP=$go2_ip
     
     # Ping robot one more time
@@ -1022,6 +1035,9 @@ launch_system() {
     
     # Set PYTHONPATH for DIMOS
     export PYTHONPATH="${SCRIPT_DIR}/src/dimos-unitree:${PYTHONPATH}"
+    
+    # Export CONN_TYPE for DIMOS (defaults to webrtc if not set)
+    export CONN_TYPE=${CONN_TYPE:-webrtc}
     
     # Agent-only mode: skip driver and verification
     if [ "$AGENT_ONLY" = true ]; then

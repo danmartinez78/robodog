@@ -87,17 +87,41 @@ class MissionAgentNode(Node):
 
         # Initialize robot interface
         self.get_logger().info("Initializing robot interface...")
+
+        # Log connection mode for diagnostics
+        conn_type = os.getenv("CONN_TYPE", "cyclonedds")
+        self.get_logger().info(f"Connection type: {conn_type}")
+        if conn_type == "webrtc":
+            self.get_logger().info(
+                "WebRTC mode: High-level API commands (sit, stand, wave) enabled"
+            )
+        else:
+            self.get_logger().warn(
+                "CycloneDDS mode: High-level API commands NOT available"
+            )
+            self.get_logger().warn("Set CONN_TYPE=webrtc to enable DIMOS skills")
+
         try:
             # Initialize ROS control
             # Costmap topic uses Nav2's default which publishes to /local_costmap/costmap
-            ros_control = UnitreeROSControl()
+            # webrtc_api_topic must match what go2_driver_node subscribes to (/webrtc_req)
+            #
+            # Note: We always use use_ros=True (ROS video/control provider)
+            # CONN_TYPE env var controls the underlying communication protocol:
+            # - CONN_TYPE=cyclonedds: Ethernet, direct motor control only
+            # - CONN_TYPE=webrtc: WiFi, enables high-level API commands (required for DIMOS)
+            ros_control = UnitreeROSControl(webrtc_api_topic="webrtc_req")
 
             # Get robot IP from environment
             robot_ip = os.getenv("GO2_IP", "192.168.1.103")
 
+            # Initialize robot with ROS provider (use_ros=True is default)
+            # The CONN_TYPE environment variable determines the underlying communication
             self.robot = UnitreeGo2(
                 ros_control=ros_control,
-                ip=robot_ip,
+                ip=robot_ip,  # Still needed for some internal checks
+                # use_ros=True (default) - Always use ROS bridge for control
+                # use_webrtc=False (default) - Don't use direct WebRTC (we use ROS bridge)
             )
             self.get_logger().info(f"Robot initialized (ip={robot_ip})")
         except Exception as e:
