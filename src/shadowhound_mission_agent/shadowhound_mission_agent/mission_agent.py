@@ -82,30 +82,24 @@ class MissionAgentNode(Node):
             self.get_logger().error("Please ensure dimos-unitree is in PYTHONPATH")
             raise RuntimeError("DIMOS not available")
 
+        # Diagnostic: Check what topics are visible to this node
+        self._log_topic_diagnostics()
+
         # Initialize robot interface
         self.get_logger().info("Initializing robot interface...")
         try:
             # Initialize ROS control
             # Note: Costmap topic will be provided by go2_robot_sdk launch
-            # WORKAROUND: Use mock_connection=True to skip wait_for_server() hang
-            # DIMOS bug: wait_for_server() called before executor starts spinning
-            ros_control = UnitreeROSControl(
-                mock_connection=True,  # Skip Nav2 action server wait (DIMOS bug workaround)
-                disable_video_stream=True,  # Temporarily disable to debug init hang
-            )
+            ros_control = UnitreeROSControl()
 
-            # Get robot IP from environment (required even for mock mode)
+            # Get robot IP from environment
             robot_ip = os.getenv("GO2_IP", "192.168.1.103")
 
             self.robot = UnitreeGo2(
                 ros_control=ros_control,
-                ip=robot_ip,  # Required for WebRTC connection
-                mock_connection=True,  # Skip Nav2 action server wait (DIMOS bug workaround)
-                disable_video_stream=True,  # Temporarily disable to debug init hang
+                ip=robot_ip,
             )
-            self.get_logger().info(
-                f"Robot initialized (mock={self.mock_robot}, ip={robot_ip})"
-            )
+            self.get_logger().info(f"Robot initialized (ip={robot_ip})")
         except Exception as e:
             self.get_logger().error(f"Failed to initialize robot: {e}")
             raise
@@ -134,6 +128,68 @@ class MissionAgentNode(Node):
         self.status_pub = self.create_publisher(String, "mission_status", 10)
 
         self.get_logger().info("ShadowHound Mission Agent ready!")
+
+    def _log_topic_diagnostics(self):
+        """Log diagnostic information about visible topics and actions."""
+        self.get_logger().info("=" * 60)
+        self.get_logger().info("🔍 TOPIC DIAGNOSTICS")
+        self.get_logger().info("=" * 60)
+        
+        # Get all topics
+        topic_names_and_types = self.get_topic_names_and_types()
+        
+        # Filter for robot-related topics
+        robot_topics = [
+            (name, types) for name, types in topic_names_and_types
+            if any(keyword in name for keyword in [
+                'go2', 'camera', 'imu', 'odom', 'costmap', 'cmd_vel', 'webrtc'
+            ])
+        ]
+        
+        if robot_topics:
+            self.get_logger().info(f"Found {len(robot_topics)} robot-related topics:")
+            for name, types in sorted(robot_topics):
+                self.get_logger().info(f"  • {name} [{', '.join(types)}]")
+        else:
+            self.get_logger().warn("⚠️  No robot topics found! Is the robot driver running?")
+        
+        # Check for specific critical topics
+        critical_topics = {
+            '/go2_states': 'Robot state data',
+            '/camera/image_raw': 'Camera feed',
+            '/imu': 'IMU data',
+            '/odom': 'Odometry',
+            '/local_costmap/costmap': 'Local costmap',
+            '/cmd_vel_out': 'Velocity commands',
+        }
+        
+        self.get_logger().info("\nCritical topic status:")
+        for topic, description in critical_topics.items():
+            found = any(name == topic for name, _ in topic_names_and_types)
+            status = "✅" if found else "❌"
+            self.get_logger().info(f"  {status} {topic} ({description})")
+        
+        # List all action servers
+        try:
+            import time
+            time.sleep(0.5)  # Give action servers time to advertise
+            
+            from rclpy.action import ActionClient
+            from nav2_msgs.action import Spin
+            
+            # Check if /spin action exists
+            spin_client = ActionClient(self, Spin, 'spin')
+            spin_available = spin_client.wait_for_server(timeout_sec=1.0)
+            spin_client.destroy()
+            
+            self.get_logger().info("\nNav2 action server status:")
+            status = "✅" if spin_available else "❌"
+            self.get_logger().info(f"  {status} /spin action server")
+            
+        except Exception as e:
+            self.get_logger().warn(f"Could not check action servers: {e}")
+        
+        self.get_logger().info("=" * 60)
 
     def _init_agent(self):
         """Initialize the DIMOS agent based on configuration."""
