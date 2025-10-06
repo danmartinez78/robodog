@@ -9,8 +9,11 @@ from typing import Callable, Optional, Dict, Any
 import asyncio
 import threading
 import logging
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
-from fastapi.responses import HTMLResponse
+import os
+import base64
+from pathlib import Path
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, File, UploadFile, Form
+from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
@@ -76,6 +79,11 @@ class WebInterface:
         # WebSocket connections for real-time status updates
         self.active_connections: list[WebSocket] = []
 
+        # Mock image storage (for testing without robot)
+        self.mock_images: Dict[str, bytes] = {}  # camera -> image_data
+        self.mock_image_dir = Path.home() / ".shadowhound" / "mock_images"
+        self.mock_image_dir.mkdir(parents=True, exist_ok=True)
+
         # Server state
         self.server = None
         self.server_thread = None
@@ -129,6 +137,74 @@ class WebInterface:
                     success=False, message=str(e), command=cmd.command
                 )
 
+        @app.post("/api/mock/image")
+        async def upload_mock_image(
+            image: UploadFile = File(...), camera: str = Form("front")
+        ):
+            """Upload mock image for testing vision skills without robot."""
+            try:
+                # Read image data
+                image_data = await image.read()
+
+                # Save to disk
+                filename = f"mock_{camera}_{image.filename}"
+                filepath = self.mock_image_dir / filename
+                with open(filepath, "wb") as f:
+                    f.write(image_data)
+
+                # Store in memory for quick access
+                self.mock_images[camera] = image_data
+
+                self.logger.info(f"Mock image uploaded: {filename} ({len(image_data)} bytes)")
+
+                # Broadcast to WebSocket clients
+                await self.broadcast(f"MOCK_IMAGE_UPLOADED: {camera} - {filename}")
+
+                return JSONResponse(
+                    content={
+                        "success": True,
+                        "message": f"Mock image uploaded for {camera} camera",
+                        "filename": filename,
+                        "size": len(image_data),
+                        "camera": camera,
+                    }
+                )
+            except Exception as e:
+                self.logger.error(f"Error uploading mock image: {e}")
+                return JSONResponse(
+                    status_code=500,
+                    content={
+                        "success": False,
+                        "message": str(e),
+                    },
+                )
+
+        @app.get("/api/mock/image/{camera}")
+        async def get_mock_image(camera: str):
+            """Get mock image for specified camera."""
+            if camera not in self.mock_images:
+                return JSONResponse(
+                    status_code=404,
+                    content={
+                        "success": False,
+                        "message": f"No mock image uploaded for {camera} camera",
+                    },
+                )
+
+            image_data = self.mock_images[camera]
+            # Return base64 encoded image
+            import base64
+
+            encoded = base64.b64encode(image_data).decode("utf-8")
+            return JSONResponse(
+                content={
+                    "success": True,
+                    "camera": camera,
+                    "image": encoded,
+                    "size": len(image_data),
+                }
+            )
+
         @app.websocket("/ws/status")
         async def websocket_status(websocket: WebSocket):
             """WebSocket endpoint for real-time status updates."""
@@ -154,156 +230,338 @@ class WebInterface:
 <!DOCTYPE html>
 <html>
 <head>
-    <title>🐕 ShadowHound Mission Control</title>
+    <title>shadowhound mission control</title>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
+        
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            font-family: 'Courier New', 'Monaco', monospace;
+            background: #1a1a1a;
+            color: #c0c0c0;
             min-height: 100vh;
             padding: 20px;
         }
+        
         .container {
-            max-width: 1200px;
+            max-width: 1600px;
             margin: 0 auto;
         }
+        
         .header {
-            text-align: center;
-            color: white;
-            margin-bottom: 30px;
-        }
-        .header h1 {
-            font-size: 3em;
-            margin-bottom: 10px;
-        }
-        .card {
-            background: white;
-            border-radius: 15px;
-            padding: 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px 20px;
+            background: #0d0d0d;
+            border: 1px solid #333;
             margin-bottom: 20px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
         }
-        .status-box {
-            background: #f8f9fa;
-            border-left: 4px solid #667eea;
-            padding: 20px;
-            border-radius: 5px;
-            margin: 20px 0;
-            font-family: 'Monaco', 'Courier New', monospace;
-            min-height: 100px;
+        
+        .header-left h1 {
+            font-size: 1.5em;
+            color: #5cb85c;
+            letter-spacing: 2px;
+            margin-bottom: 5px;
         }
-        .status-box .status-text {
-            color: #333;
-            font-size: 1.1em;
+        
+        .header-left .subtitle {
+            font-size: 0.85em;
+            color: #666;
         }
-        .command-input {
-            width: 100%;
-            padding: 15px;
-            border: 2px solid #e0e0e0;
-            border-radius: 8px;
-            font-size: 1.1em;
-            transition: border-color 0.3s;
+        
+        .header-right {
+            text-align: right;
         }
-        .command-input:focus {
-            outline: none;
-            border-color: #667eea;
-        }
-        .btn {
-            padding: 15px 30px;
-            border: none;
-            border-radius: 8px;
-            font-size: 1.1em;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s;
-            margin: 5px;
-        }
-        .btn-primary {
-            background: #667eea;
-            color: white;
-        }
-        .btn-primary:hover {
-            background: #5568d3;
-            transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
-        }
-        .btn-secondary {
-            background: #6c757d;
-            color: white;
-        }
-        .btn-secondary:hover {
-            background: #5a6268;
-        }
-        .quick-commands {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-            gap: 10px;
-            margin-top: 20px;
-        }
+        
         .connection-status {
             display: inline-block;
-            padding: 5px 15px;
-            border-radius: 20px;
-            font-size: 0.9em;
-            font-weight: 600;
+            padding: 6px 12px;
+            border: 1px solid;
+            font-size: 0.85em;
+            font-weight: bold;
         }
+        
         .connected {
-            background: #d4edda;
-            color: #155724;
+            background: #0d0d0d;
+            color: #5cb85c;
+            border-color: #5cb85c;
         }
+        
         .disconnected {
-            background: #f8d7da;
-            color: #721c24;
+            background: #0d0d0d;
+            color: #ff0000;
+            border-color: #ff0000;
         }
-        h2 {
-            color: #333;
+        
+        .main-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            grid-template-rows: auto auto;
+            gap: 20px;
             margin-bottom: 20px;
-            font-size: 1.8em;
         }
-        h3 {
-            color: #555;
+        
+        .panel {
+            background: #0d0d0d;
+            border: 1px solid #333;
+            padding: 20px;
+        }
+        
+        .panel-header {
+            font-size: 0.9em;
+            color: #5cb85c;
             margin-bottom: 15px;
-            font-size: 1.3em;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #333;
+        }
+        
+        .camera-panel {
+            grid-column: 1;
+            grid-row: 1;
+            min-height: 400px;
+        }
+        
+        .camera-feed {
+            width: 100%;
+            aspect-ratio: 16/9;
+            background: #000;
+            border: 1px solid #333;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .camera-feed img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+        
+        .camera-placeholder {
+            color: #333;
+            font-size: 1.2em;
+            text-align: center;
+        }
+        
+        .upload-panel {
+            margin-top: 15px;
+            padding: 15px;
+            background: #1a1a1a;
+            border: 1px solid #333;
+        }
+        
+        .upload-label {
+            font-size: 0.85em;
+            color: #888;
+            margin-bottom: 10px;
+            display: block;
+        }
+        
+        .file-input-wrapper {
+            position: relative;
+            display: inline-block;
+            width: 100%;
+        }
+        
+        .file-input-wrapper input[type="file"] {
+            position: absolute;
+            opacity: 0;
+            width: 100%;
+            height: 100%;
+            cursor: pointer;
+        }
+        
+        .file-input-button {
+            display: block;
+            width: 100%;
+            padding: 12px;
+            background: #0d0d0d;
+            border: 1px dashed #555;
+            color: #c0c0c0;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .file-input-button:hover {
+            background: #1a1a1a;
+            border-color: #888;
+        }
+        
+        .mission-panel {
+            grid-column: 2;
+            grid-row: 1 / span 2;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .status-display {
+            flex: 1;
+            background: #000;
+            border: 1px solid #333;
+            padding: 15px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+            color: #c0c0c0;
+            overflow-y: auto;
+            max-height: 300px;
+            margin-bottom: 20px;
+        }
+        
+        .status-display .log-entry {
+            padding: 3px 0;
+            line-height: 1.5;
+        }
+        
+        .command-input {
+            width: 100%;
+            padding: 12px;
+            background: #000;
+            border: 1px solid #333;
+            color: #5cb85c;
+            font-family: 'Courier New', monospace;
+            font-size: 1em;
+        }
+        
+        .command-input:focus {
+            outline: none;
+            border-color: #555;
+            background: #0d0d0d;
+        }
+        
+        .command-input::placeholder {
+            color: #333;
+        }
+        
+        .btn {
+            padding: 12px 24px;
+            border: 1px solid #333;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+            cursor: pointer;
+            transition: all 0.2s;
+            margin-top: 15px;
+            background: #0d0d0d;
+        }
+        
+        .btn-primary {
+            border-color: #5cb85c;
+            color: #5cb85c;
+        }
+        
+        .btn-primary:hover {
+            background: #1a1a1a;
+        }
+        
+        .btn-primary:active {
+            background: #000;
+        }
+        
+        .diagnostics-panel {
+            grid-column: 1;
+            grid-row: 2;
+        }
+        
+        .diag-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+        
+        .diag-item {
+            padding: 12px;
+            background: #1a1a1a;
+            border: 1px solid #333;
+        }
+        
+        .diag-label {
+            font-size: 0.75em;
+            color: #666;
+            margin-bottom: 5px;
+        }
+        
+        .diag-value {
+            font-size: 1.1em;
+            color: #5cb85c;
+            font-weight: bold;
         }
     </style>
 </head>
 <body>
     <div class="container">
+        <!-- Header -->
         <div class="header">
-            <h1>🐕 ShadowHound</h1>
-            <p>Autonomous Robot Mission Control</p>
-            <span id="wsStatus" class="connection-status disconnected">Connecting...</span>
-        </div>
-        
-        <div class="card">
-            <h2>📊 Mission Status</h2>
-            <div class="status-box">
-                <div id="status" class="status-text">Waiting for updates...</div>
+            <div class="header-left">
+                <h1>shadowhound@mission-control:~$</h1>
+                <div class="subtitle">autonomous robot control interface</div>
+            </div>
+            <div class="header-right">
+                <span id="wsStatus" class="connection-status disconnected">[OFFLINE]</span>
             </div>
         </div>
         
-        <div class="card">
-            <h2>🎮 Command Center</h2>
-            <h3>Custom Command</h3>
-            <input 
-                type="text" 
-                id="commandInput" 
-                class="command-input" 
-                placeholder="Enter mission command (e.g., 'stand up and wave hello')"
-                onkeypress="if(event.key === 'Enter') sendCommand()"
-            >
-            <button class="btn btn-primary" onclick="sendCommand()">▶️ Execute Command</button>
+        <!-- Main Grid -->
+        <div class="main-grid">
+            <!-- Camera Feed Panel -->
+            <div class="panel camera-panel">
+                <div class="panel-header">camera_feed:</div>
+                <div class="camera-feed" id="cameraFeed">
+                    <div class="camera-placeholder">[ no signal ]</div>
+                </div>
+                
+                <!-- Mock Image Upload -->
+                <div class="upload-panel">
+                    <label class="upload-label">mock_image (testing):</label>
+                    <div class="file-input-wrapper">
+                        <input type="file" id="imageUpload" accept="image/*" onchange="uploadMockImage(event)">
+                        <div class="file-input-button">[ upload test image ]</div>
+                    </div>
+                </div>
+            </div>
             
-            <h3 style="margin-top: 30px;">Quick Commands</h3>
-            <div class="quick-commands">
-                <button class="btn btn-secondary" onclick="sendQuick('stand up')">🧍 Stand Up</button>
-                <button class="btn btn-secondary" onclick="sendQuick('sit down')">🪑 Sit Down</button>
-                <button class="btn btn-secondary" onclick="sendQuick('wave hello')">👋 Wave</button>
-                <button class="btn btn-secondary" onclick="sendQuick('perform dance 1')">💃 Dance</button>
-                <button class="btn btn-secondary" onclick="sendQuick('stretch')">🤸 Stretch</button>
-                <button class="btn btn-secondary" onclick="sendQuick('balance stand')">⚖️ Balance</button>
+            <!-- Mission Control Panel -->
+            <div class="panel mission-panel">
+                <div class="panel-header">mission_log:</div>
+                <div class="status-display" id="status">
+                    <div class="log-entry">system ready. awaiting commands.</div>
+                </div>
+                <input 
+                    type="text" 
+                    id="commandInput" 
+                    class="command-input" 
+                    placeholder="$ enter command..."
+                    onkeypress="if(event.key === 'Enter') sendCommand()"
+                >
+                <button class="btn btn-primary" onclick="sendCommand()">[ execute ]</button>
+            </div>
+            
+            <!-- Diagnostics Panel -->
+            <div class="panel diagnostics-panel">
+                <div class="panel-header">diagnostics:</div>
+                <div class="diag-grid">
+                    <div class="diag-item">
+                        <div class="diag-label">status:</div>
+                        <div class="diag-value" id="diagStatus">IDLE</div>
+                    </div>
+                    <div class="diag-item">
+                        <div class="diag-label">battery:</div>
+                        <div class="diag-value" id="diagBattery">--</div>
+                    </div>
+                    <div class="diag-item">
+                        <div class="diag-label">position:</div>
+                        <div class="diag-value" id="diagPosition">0.0, 0.0</div>
+                    </div>
+                    <div class="diag-item">
+                        <div class="diag-label">connection:</div>
+                        <div class="diag-value" id="diagConnection">STANDBY</div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -313,6 +571,9 @@ class WebInterface:
         const statusDiv = document.getElementById('status');
         const wsStatusSpan = document.getElementById('wsStatus');
         const commandInput = document.getElementById('commandInput');
+        const cameraFeed = document.getElementById('cameraFeed');
+        const diagStatus = document.getElementById('diagStatus');
+        const diagConnection = document.getElementById('diagConnection');
         
         // WebSocket connection
         function connectWebSocket() {
@@ -321,45 +582,73 @@ class WebInterface:
             
             ws.onopen = () => {
                 console.log('WebSocket connected');
-                wsStatusSpan.textContent = 'Connected';
+                wsStatusSpan.textContent = '[ONLINE]';
                 wsStatusSpan.className = 'connection-status connected';
+                diagConnection.textContent = 'ONLINE';
+                addLogEntry('websocket connected');
             };
             
             ws.onmessage = (event) => {
                 console.log('Status update:', event.data);
-                statusDiv.textContent = event.data;
-                statusDiv.style.color = event.data.includes('FAILED') ? '#dc3545' : 
-                                      event.data.includes('COMPLETED') ? '#28a745' : '#333';
+                addLogEntry(event.data.toLowerCase());
+                
+                // Update diagnostics
+                if (event.data.includes('EXECUTING')) {
+                    diagStatus.textContent = 'ACTIVE';
+                } else if (event.data.includes('COMPLETED')) {
+                    diagStatus.textContent = 'IDLE';
+                }
             };
             
             ws.onclose = () => {
                 console.log('WebSocket disconnected');
-                wsStatusSpan.textContent = 'Disconnected';
+                wsStatusSpan.textContent = '[OFFLINE]';
                 wsStatusSpan.className = 'connection-status disconnected';
+                diagConnection.textContent = 'OFFLINE';
+                addLogEntry('websocket disconnected', 'error');
                 // Reconnect after 3 seconds
                 setTimeout(connectWebSocket, 3000);
             };
             
             ws.onerror = (error) => {
                 console.error('WebSocket error:', error);
+                addLogEntry('websocket error', 'error');
             };
+        }
+        
+        function addLogEntry(message, type = 'info') {
+            const entry = document.createElement('div');
+            entry.className = 'log-entry';
+            
+            const timestamp = new Date().toLocaleTimeString('en-US', { hour12: false });
+            const prefix = type === 'error' ? '[!]' : '[>]';
+            
+            entry.textContent = `${timestamp} ${prefix} ${message}`;
+            
+            if (type === 'error') {
+                entry.style.color = '#ff0000';
+            }
+            
+            statusDiv.appendChild(entry);
+            statusDiv.scrollTop = statusDiv.scrollHeight;
+            
+            // Keep only last 50 entries
+            while (statusDiv.children.length > 50) {
+                statusDiv.removeChild(statusDiv.firstChild);
+            }
         }
         
         // Send command via REST API
         async function sendCommand() {
             const command = commandInput.value.trim();
             if (!command) {
-                alert('Please enter a command');
+                addLogEntry('no command entered', 'error');
                 return;
             }
             
-            sendQuick(command);
+            addLogEntry(`executing: ${command}`);
+            diagStatus.textContent = 'ACTIVE';
             commandInput.value = '';
-        }
-        
-        async function sendQuick(command) {
-            statusDiv.textContent = `⏳ Sending: ${command}`;
-            statusDiv.style.color = '#666';
             
             try {
                 const response = await fetch('/api/mission', {
@@ -372,21 +661,61 @@ class WebInterface:
                 console.log('Response:', data);
                 
                 if (data.success) {
-                    statusDiv.textContent = `✅ ${data.message}`;
-                    statusDiv.style.color = '#28a745';
+                    addLogEntry(`completed: ${data.message}`);
+                    diagStatus.textContent = 'IDLE';
                 } else {
-                    statusDiv.textContent = `❌ ${data.message}`;
-                    statusDiv.style.color = '#dc3545';
+                    addLogEntry(`failed: ${data.message}`, 'error');
+                    diagStatus.textContent = 'ERROR';
                 }
             } catch (error) {
                 console.error('Error sending command:', error);
-                statusDiv.textContent = `❌ Error: ${error.message}`;
-                statusDiv.style.color = '#dc3545';
+                addLogEntry(`system error: ${error.message}`, 'error');
+                diagStatus.textContent = 'ERROR';
+            }
+        }
+        
+        // Mock image upload
+        async function uploadMockImage(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            
+            addLogEntry(`uploading: ${file.name}`);
+            
+            // Display image in camera feed
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                cameraFeed.innerHTML = `<img src="${e.target.result}" alt="Mock camera feed">`;
+                addLogEntry('mock image loaded');
+            };
+            reader.readAsDataURL(file);
+            
+            // Upload to backend
+            const formData = new FormData();
+            formData.append('image', file);
+            formData.append('camera', 'front');
+            
+            try {
+                const response = await fetch('/api/mock/image', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    addLogEntry(`uploaded: ${data.filename}`);
+                } else {
+                    addLogEntry(`upload failed: ${data.message}`, 'error');
+                }
+            } catch (error) {
+                console.error('Error uploading image:', error);
+                addLogEntry(`upload error: ${error.message}`, 'error');
             }
         }
         
         // Initialize
         connectWebSocket();
+        addLogEntry('system initialized');
     </script>
 </body>
 </html>
@@ -421,6 +750,24 @@ class WebInterface:
             except RuntimeError:
                 # No event loop, create one
                 asyncio.run(self.broadcast(message))
+
+    def get_mock_image(self, camera: str = "front") -> Optional[bytes]:
+        """Get mock image data for specified camera.
+        
+        This method can be called by vision skills to retrieve uploaded mock images
+        for testing without robot hardware.
+        
+        Args:
+            camera: Camera name ('front', 'left', 'right')
+            
+        Returns:
+            Image data as bytes, or None if no mock image available
+        """
+        return self.mock_images.get(camera)
+
+    def has_mock_image(self, camera: str = "front") -> bool:
+        """Check if mock image exists for specified camera."""
+        return camera in self.mock_images
 
     def start(self):
         """Start web server in background thread."""
