@@ -2,6 +2,39 @@
 
 Helper scripts for easy setup and operation of the ShadowHound system.
 
+## Development Tracking Scripts
+
+### 📝 `add-devlog-entry.sh` - Quick DevLog Entry
+
+Interactive script to add entries to DEVLOG.md with proper formatting.
+
+**Usage:**
+```bash
+./scripts/add-devlog-entry.sh
+```
+
+**What it does:**
+1. Prompts for entry details (title, description, learnings, etc.)
+2. Formats entry with proper markdown
+3. Inserts at top of DEVLOG.md (after header)
+4. Optionally commits changes with proper message
+
+**Example:**
+```bash
+$ ./scripts/add-devlog-entry.sh
+ShadowHound DevLog Entry Helper
+
+Creating entry for 2025-10-06
+
+Brief title: Fixed Camera Feed Bug
+What was done? Resolved issue with compressed image transport
+...
+```
+
+See [docs/DEVELOPMENT_TRACKING.md](docs/DEVELOPMENT_TRACKING.md) for full guide.
+
+---
+
 ## Main Scripts
 
 ### 🚀 `start.sh` - Main Launch Script
