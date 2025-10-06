@@ -2,7 +2,7 @@
 
 **Date:** October 5-6, 2025  
 **Branch:** `fix/webrtc-instant-commands-and-progress` in dimos-unitree fork  
-**Status:** ✅ Fixed and ready for testing
+**Status:** 🔧 Fix implemented, awaiting validation
 
 ---
 
@@ -135,16 +135,23 @@ repositories:
 ## Current State
 
 ### ✅ Completed
-- Queue fix implemented and tested via CLI
+- Queue fix logic implemented in `ros_command_queue.py`
+- State detection simplified in `unitree_ros_control.py`
 - Import errors resolved
 - Build issues fixed (submodule reverted, models skipped)
 - All changes pushed to `fix/webrtc-instant-commands-and-progress` branch
 - `shadowhound.repos` updated to point to fix branch
 - Clean build verified in devcontainer
 
-### ⏳ Ready for Testing
-- **Need to test via Web UI on laptop** to confirm the fix works end-to-end
-- Commands should now work through mission agent when called from web interface
+### ⚠️ NOT YET TESTED
+- **The fix has NOT been validated via web UI** - this is critical!
+- We only confirmed:
+  - ✅ Code compiles and builds cleanly
+  - ✅ Commands work via CLI (but CLI never had the issue)
+  - ❌ **Web UI command execution NOT tested yet**
+
+### 🎯 Critical Next Step
+**Test via Web UI on laptop** - This is the ONLY way to know if the fix actually works!
 
 ### 🎯 Test Commands (via Web UI)
 ```
@@ -175,7 +182,7 @@ source install/setup.bash
 ros2 launch shadowhound_bringup shadowhound_bringup.launch.py
 ```
 
-### Expected Behavior After Fix
+### Expected Behavior After Fix (IF IT WORKS)
 1. **Web UI commands should execute immediately** (no more hanging)
 2. **Agent should receive success/failure responses** within 2-3 seconds
 3. **Progress state transitions visible** in logs:
@@ -186,6 +193,13 @@ ros2 launch shadowhound_bringup shadowhound_bringup.launch.py
    [INFO] Waiting for completion...
    [INFO] Command complete (progress=0)
    ```
+
+### What Could Still Go Wrong
+- The 2-second busy detection timeout might be too short
+- State transitions might happen even faster than 50ms polling
+- Progress state might not be reliable indicator
+- There could be race conditions we didn't account for
+- The fix might only work for some commands, not all
 
 ---
 
@@ -217,27 +231,33 @@ Web UI → Mission Agent → ROSCommandQueue → /webrtc_req → go2_driver_node
 2. **No pose feedback** - Can't verify if commands achieved desired result
 3. **2-second busy detection timeout** - Might be too long for some use cases
 
-### Not Tested Yet
-- ❓ Actual web UI execution (only tested via CLI so far)
-- ❓ Error handling for failed commands
-- ❓ Multiple rapid commands in sequence
-- ❓ Command interruption/cancellation
+### Not Tested Yet ⚠️
+- ❌ **Actual web UI execution** (CRITICAL - this is the whole point!)
+- ❌ The fix might not work at all
+- ❌ Error handling for failed commands
+- ❌ Multiple rapid commands in sequence
+- ❌ Command interruption/cancellation
+
+**Bottom line:** We have a theory and an implementation, but zero proof it works.
 
 ---
 
 ## Next Steps
 
-### Immediate (Priority 1)
-1. **Test via Web UI on laptop** ⚡
-   - Deploy the fix
+### Immediate (Priority 1) - CRITICAL ⚡
+1. **Test via Web UI on laptop** 🔴 **MUST DO FIRST**
+   - Deploy the fix to laptop
    - Try "sit", "hello", "stretch" via web interface
-   - Verify queue no longer hangs
+   - **This will tell us if the fix actually works**
    - Check logs for proper state transitions
+   - If it hangs: back to the drawing board
+   - If it works: celebrate and move to validation
 
-2. **Validate error handling**
+2. **IF the fix works, validate edge cases**
    - Test invalid command IDs
    - Test commands during motion (busy state)
    - Verify timeout behavior
+   - Try rapid command sequences
 
 ### Short Term (Priority 2)
 3. **Add telemetry/logging**
@@ -308,12 +328,13 @@ shadowhound/
 
 ## Questions for Next Session
 
-1. Does the fix work via web UI? (Critical validation)
-2. Should we add a "became_busy" flag to telemetry?
-3. What's the right busy detection timeout? (currently 2s)
-4. Should instant commands have a different timeout than motion commands?
-5. Do we need to handle rapid command sequences specially?
+1. **Does the fix work via web UI?** 🔴 (Critical - we don't know yet!)
+2. **IF it works:** Should we add a "became_busy" flag to telemetry?
+3. **IF it works:** What's the right busy detection timeout? (currently 2s)
+4. **IF it works:** Should instant commands have a different timeout than motion commands?
+5. **IF it doesn't work:** What did we miss in the state machine logic?
+6. **IF it doesn't work:** Do we need to monitor a different state topic?
 
 ---
 
-**Status:** Ready for web UI testing. The fix is deployed and builds cleanly. Next step is validation on the actual robot through the web interface. 🚀
+**Status:** Fix implemented but UNVALIDATED. We have a hypothesis (instant commands transition too fast for the queue to detect) and a proposed solution (wait FOR busy state with timeout), but we haven't tested if it actually solves the problem. Next session MUST start with web UI testing. 🧪
