@@ -199,7 +199,7 @@ class MissionExecutor:
                 dev_name="shadowhound",
                 agent_type="Mission",
                 skills=self.skills,
-                model=self.config.agent_model,
+                model_name=self.config.agent_model,
             )
             self.logger.info(f"DIMOS OpenAIAgent initialized (model={self.config.agent_model})")
 
