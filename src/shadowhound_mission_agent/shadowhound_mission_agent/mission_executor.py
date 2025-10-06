@@ -48,6 +48,8 @@ class MissionExecutorConfig:
     robot_ip: str = "192.168.1.103"  # Robot IP address
     webrtc_api_topic: str = "webrtc_req"  # ROS topic for WebRTC API commands
     agent_model: str = "gpt-4-turbo"  # LLM model to use
+    max_output_tokens: int = 4096  # Max tokens for model output
+    max_input_tokens: int = 128000  # Max tokens for model input
 
 
 class MissionExecutor:
@@ -200,8 +202,14 @@ class MissionExecutor:
                 agent_type="Mission",
                 skills=self.skills,
                 model_name=self.config.agent_model,
+                max_output_tokens_per_request=self.config.max_output_tokens,
+                max_input_tokens_per_request=self.config.max_input_tokens,
             )
-            self.logger.info(f"DIMOS OpenAIAgent initialized (model={self.config.agent_model})")
+            self.logger.info(
+                f"DIMOS OpenAIAgent initialized "
+                f"(model={self.config.agent_model}, "
+                f"max_output={self.config.max_output_tokens})"
+            )
 
     def execute_mission(self, command: str) -> str:
         """Execute a mission command.
