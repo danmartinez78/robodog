@@ -283,6 +283,43 @@ ros2 daemon stop && ros2 daemon start
 
 ---
 
+## Development Tracking
+
+### 📖 DevLog & TODO System
+
+We maintain organized tracking of development progress and tasks:
+
+- **[`DEVLOG.md`](DEVLOG.md)** - Chronological record of what was done and why
+  - Major features and fixes
+  - Technical decisions
+  - Key learnings
+  - Add entries after completing significant work
+
+- **[`TODO.md`](TODO.md)** - Organized task list with priorities
+  - 🔴 High / 🟡 Medium / 🟢 Low priority
+  - Clear acceptance criteria
+  - Recently completed section
+
+- **[`docs/DEVELOPMENT_TRACKING.md`](docs/DEVELOPMENT_TRACKING.md)** - Complete guide
+  - When and how to update
+  - Workflows and best practices
+  - Example entries
+
+### Quick Commands
+
+```bash
+# Add a devlog entry (interactive)
+./scripts/add-devlog-entry.sh
+
+# View priorities
+grep -A 3 "## 🔴 High Priority" TODO.md
+
+# View recent entries
+head -n 50 DEVLOG.md
+```
+
+---
+
 ## Contributing
 
 ### Development Principles
