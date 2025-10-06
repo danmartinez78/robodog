@@ -1,482 +1,449 @@
-# Agent Architecture
+# Mission Agent Architecture
 
 ## Overview
 
-The ShadowHound agent module provides a clean, decoupled architecture for AI agents that control the robot. It separates agent logic from ROS orchestration, making the code more testable, maintainable, and extensible.
+The ShadowHound mission agent provides a clean, layered architecture that separates ROS concerns from business logic. This enables testing without ROS, reuse in non-ROS contexts (scripts, notebooks, web apps), and follows DIMOS framework conventions.
+
+## Architectural Decision
+
+**Key Insight**: DIMOS already provides the agent abstraction we need. Skills are the extension point, not agent types.
+
+After analysis (see `docs/AGENT_REFACTOR_ANALYSIS.md`), we simplified from a custom agent wrapper to using DIMOS agents directly, with proper separation of concerns.
 
 ## Architecture Diagram
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                      Mission Agent Node (ROS)                   │
-│  ┌───────────────────────────────────────────────────────────┐  │
-│  │                      AgentFactory                         │  │
-│  │  Creates agents based on configuration                    │  │
-│  └───────────────────────────────────────────────────────────┘  │
-│                              │                                   │
-│                              ▼                                   │
-│  ┌───────────────────────────────────────────────────────────┐  │
-│  │                      BaseAgent                            │  │
-│  │  Abstract interface for all agents                        │  │
-│  │  - execute_mission(command) -> MissionResult              │  │
-│  │  - plan_mission(command) -> List[SkillCall]               │  │
-│  └───────────────────────────────────────────────────────────┘  │
-│                              │                                   │
-│              ┌───────────────┼───────────────┐                  │
-│              ▼               ▼               ▼                  │
-│      ┌──────────────┐ ┌──────────────┐ ┌──────────────┐        │
-│      │ OpenAIAgent  │ │PlanningAgent │ │ CustomAgent  │        │
-│      │ (GPT-4)      │ │(DIMOS Plan)  │ │ (Your impl)  │        │
-│      └──────────────┘ └──────────────┘ └──────────────┘        │
-│              │               │               │                  │
-│              └───────────────┼───────────────┘                  │
-│                              ▼                                   │
-│  ┌───────────────────────────────────────────────────────────┐  │
-│  │                   Robot Skills API                        │  │
-│  │  - nav.goto, nav.rotate, perception.snapshot, etc.        │  │
-│  └───────────────────────────────────────────────────────────┘  │
-└─────────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────┐
+│                    MissionAgentNode (ROS Wrapper)                   │
+│                                                                      │
+│  ┌────────────────────────────────────────────────────────────────┐ │
+│  │  ROS-Specific Concerns:                                        │ │
+│  │  • Node lifecycle (init, spin, shutdown)                       │ │
+│  │  • Parameters (agent_backend, robot_ip, etc.)                  │ │
+│  │  • Topic subscriptions (/mission_command)                      │ │
+│  │  • Topic publishers (/mission_status)                          │ │
+│  │  • ROS logging bridge                                          │ │
+│  │  • Web interface management                                    │ │
+│  └────────────────────────────────────────────────────────────────┘ │
+│                              │                                       │
+│                              │ delegates to                          │
+│                              ▼                                       │
+│  ┌────────────────────────────────────────────────────────────────┐ │
+│  │              MissionExecutor (Pure Python)                     │ │
+│  │                                                                 │ │
+│  │  Business Logic:                                                │ │
+│  │  • Robot initialization (DIMOS UnitreeGo2)                      │ │
+│  │  • Skill library setup (DIMOS MyUnitreeSkills)                  │ │
+│  │  • Agent initialization (DIMOS OpenAIAgent/PlanningAgent)       │ │
+│  │  • Mission execution logic                                      │ │
+│  │  • Status queries                                               │ │
+│  │                                                                 │ │
+│  │  ✅ No ROS dependencies                                         │ │
+│  │  ✅ Testable without ROS                                        │ │
+│  │  ✅ Reusable in scripts, notebooks, web apps                    │ │
+│  └────────────────────────────────────────────────────────────────┘ │
+│                              │                                       │
+│                              │ uses                                  │
+│                              ▼                                       │
+│  ┌────────────────────────────────────────────────────────────────┐ │
+│  │                      DIMOS Framework                            │ │
+│  │                                                                 │ │
+│  │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐         │ │
+│  │  │ OpenAIAgent  │  │PlanningAgent │  │  UnitreeGo2  │         │ │
+│  │  │  (GPT-4)     │  │ (ReAct loop) │  │   (Robot)    │         │ │
+│  │  └──────────────┘  └──────────────┘  └──────────────┘         │ │
+│  │                                                                 │ │
+│  │  ┌──────────────────────────────────────────────────┐          │ │
+│  │  │           MyUnitreeSkills                        │          │ │
+│  │  │  • move_forward, rotate, sit, stand              │          │ │
+│  │  │  • Skills available via function calling         │          │ │
+│  │  └──────────────────────────────────────────────────┘          │ │
+│  └────────────────────────────────────────────────────────────────┘ │
+└─────────────────────────────────────────────────────────────────────┘
 ```
 
 ## Core Components
 
-### 1. BaseAgent (Abstract)
+### 1. MissionAgentNode (ROS Wrapper)
 
-The foundation interface that all agents must implement.
+**File**: `mission_agent.py` (292 lines)
+
+**Purpose**: Thin ROS wrapper that handles ROS-specific concerns only.
+
+**Responsibilities**:
+- ROS node lifecycle management
+- ROS parameter handling
+- Topic subscriptions and publications
+- Web interface integration
+- ROS logging bridge
+
+**Example**:
+```python
+# In a launch file
+from launch_ros.actions import Node
+
+Node(
+    package='shadowhound_mission_agent',
+    executable='mission_agent',
+    parameters=[{
+        'agent_backend': 'cloud',
+        'robot_ip': '192.168.1.103',
+        'agent_model': 'gpt-4-turbo',
+    }]
+)
+```
+
+**ROS Topics**:
+- **Subscribed**: `/mission_command` (std_msgs/String) - Incoming mission commands
+- **Published**: `/mission_status` (std_msgs/String) - Mission status updates
+
+### 2. MissionExecutor (Pure Python Business Logic)
+
+**File**: `mission_executor.py` (312 lines)
+
+**Purpose**: Encapsulates all mission execution logic without ROS dependencies.
+
+**Responsibilities**:
+- Robot initialization (DIMOS `UnitreeGo2`)
+- Skill library setup (DIMOS `MyUnitreeSkills`)
+- Agent initialization (DIMOS `OpenAIAgent` or `PlanningAgent`)
+- Mission execution
+- Status queries
+
+**Example Usage**:
 
 ```python
-from shadowhound_mission_agent.agent import BaseAgent, MissionResult, SkillCall
+from shadowhound_mission_agent.mission_executor import (
+    MissionExecutor,
+    MissionExecutorConfig
+)
 
-class MyCustomAgent(BaseAgent):
-    def execute_mission(self, command: str) -> MissionResult:
-        """Execute a natural language command."""
-        # Your implementation
-        return MissionResult(
-            status=MissionStatus.SUCCESS,
-            message="Mission completed",
-            skills_executed=[...],
-            telemetry={...}
-        )
+# In a ROS node
+config = MissionExecutorConfig(
+    agent_backend="cloud",
+    robot_ip="192.168.1.103",
+    agent_model="gpt-4-turbo"
+)
+executor = MissionExecutor(config, logger=node.get_logger())
+executor.initialize()
+result = executor.execute_mission("patrol the perimeter")
+
+# In a script (no ROS!)
+import logging
+logger = logging.getLogger(__name__)
+config = MissionExecutorConfig()
+executor = MissionExecutor(config, logger=logger)
+executor.initialize()
+result = executor.execute_mission("go to waypoint A")
+
+# In a Jupyter notebook
+executor = MissionExecutor(MissionExecutorConfig())
+executor.initialize()
+status = executor.get_robot_status()
+skills = executor.get_available_skills()
+result = executor.execute_mission("rotate 90 degrees")
+```
+
+**API**:
+- `initialize()` - Initialize robot, skills, and agent
+- `execute_mission(command: str) -> str` - Execute mission, return response
+- `get_robot_status() -> Dict[str, Any]` - Get robot status info
+- `get_available_skills() -> list` - Get list of available skills
+- `cleanup()` - Clean up resources
+
+### 3. MissionExecutorConfig (Configuration)
+
+**Purpose**: Configuration dataclass for MissionExecutor.
+
+```python
+from shadowhound_mission_agent.mission_executor import MissionExecutorConfig
+
+config = MissionExecutorConfig(
+    agent_backend="cloud",          # 'cloud' or 'local'
+    use_planning_agent=False,       # Use PlanningAgent vs OpenAIAgent
+    robot_ip="192.168.1.103",       # Robot IP address
+    webrtc_api_topic="webrtc_req",  # ROS topic for WebRTC commands
+    agent_model="gpt-4-turbo"       # LLM model to use
+)
+```
+
+## DIMOS Integration
+
+We use DIMOS components directly (no wrapper):
+
+### Agent Types
+
+**OpenAIAgent** (default):
+- Uses OpenAI function calling
+- Best for general missions
+- Configurable model (gpt-4-turbo, gpt-4o, etc.)
+
+**PlanningAgent**:
+- Uses ReAct-style planning loop
+- Best for complex multi-step missions
+- Built-in retry and error handling
+
+**Selection**:
+```python
+# OpenAIAgent (default)
+config = MissionExecutorConfig(use_planning_agent=False)
+
+# PlanningAgent
+config = MissionExecutorConfig(use_planning_agent=True)
+```
+
+### Skills Extension
+
+**DIMOS Pattern**: Skills are the extension point, not agent types.
+
+To add new capabilities:
+1. Add skills to `MyUnitreeSkills` (in DIMOS)
+2. Skills automatically available to all agents via function calling
+3. No need to modify agent code
+
+**Example** (in DIMOS):
+```python
+class MyUnitreeSkills(Skills):
+    def __init__(self, robot):
+        super().__init__(robot)
     
-    def plan_mission(self, command: str) -> list[SkillCall]:
-        """Generate a plan without executing."""
-        # Your implementation
-        return [SkillCall(...), SkillCall(...)]
-```
-
-**Key Methods:**
-- `execute_mission(command: str) -> MissionResult` - Execute a command and return structured result
-- `plan_mission(command: str) -> list[SkillCall]` - Generate execution plan (optional, returns [] by default)
-
-**Attributes:**
-- `skills` - SkillLibrary instance for robot control
-- `robot` - Robot interface instance
-- `config` - Configuration dict (model, dev_name, etc.)
-
-### 2. MissionResult (Dataclass)
-
-Structured result from mission execution with telemetry and status tracking.
-
-```python
-@dataclass
-class MissionResult:
-    status: MissionStatus  # SUCCESS, FAILURE, PARTIAL, CANCELLED
-    message: str  # Human-readable outcome description
-    skills_executed: List[SkillCall] = None  # Successfully executed skills
-    skills_failed: List[SkillCall] = None  # Failed skills
-    raw_response: Optional[str] = None  # Raw AI response (debugging)
-    telemetry: Dict[str, Any] = None  # Metrics (time, tokens, etc.)
-```
-
-**Example:**
-```python
-result = agent.execute_mission("Go to the kitchen")
-
-if result.status == MissionStatus.SUCCESS:
-    print(f"✅ {result.message}")
-    print(f"Executed {len(result.skills_executed)} skills")
-    print(f"Telemetry: {result.telemetry}")
-else:
-    print(f"❌ {result.message}")
-    print(f"Failed skills: {result.skills_failed}")
-```
-
-### 3. AgentFactory
-
-Factory pattern for creating agent instances based on type string.
-
-```python
-from shadowhound_mission_agent.agent import AgentFactory
-
-# Create agent
-agent = AgentFactory.create(
-    agent_type="openai",  # or "planning", "custom"
-    skills=my_skills,
-    robot=my_robot,
-    config={
-        "dev_name": "shadowhound",
-        "model": "gpt-4-turbo",
-    }
-)
-
-# Or from config file
-agent = AgentFactory.from_config_dict({
-    "agent_type": "openai",
-    "dev_name": "shadowhound",
-    "model": "gpt-4-turbo"
-})
-```
-
-**Registering Custom Agents:**
-```python
-class MyLocalLLMAgent(BaseAgent):
-    # Your implementation
-    pass
-
-# Register with factory
-AgentFactory.register_agent_type("local_llm", MyLocalLLMAgent)
-
-# Now you can create it
-agent = AgentFactory.create(agent_type="local_llm", ...)
-```
-
-### 4. Built-in Agent Implementations
-
-#### OpenAIAgent
-Wraps DIMOS OpenAIAgent for GPT-4/GPT-3.5 mission execution.
-
-```python
-agent = AgentFactory.create(
-    agent_type="openai",
-    skills=skills,
-    robot=robot,
-    config={"model": "gpt-4-turbo"}
-)
-```
-
-**Features:**
-- Uses OpenAI API (requires `OPENAI_API_KEY`)
-- Handles Observable pattern from DIMOS
-- Returns structured MissionResult
-- Automatic error handling
-
-#### PlanningAgent
-Wraps DIMOS PlanningAgent for explicit planning before execution.
-
-```python
-agent = AgentFactory.create(
-    agent_type="planning",
-    skills=skills,
-    robot=robot,
-    config={"dev_name": "shadowhound"}
-)
-
-# Plan first (optional)
-plan = agent.plan_mission("Patrol the perimeter")
-print(f"Plan: {plan}")
-
-# Execute
-result = agent.execute_mission("Patrol the perimeter")
-```
-
-**Features:**
-- Separate planning and execution phases
-- Better transparency into AI decisions
-- Plan validation before execution
-
-## Usage in Mission Agent Node
-
-The `MissionAgentNode` uses the factory to create agents based on ROS parameters:
-
-```python
-# In MissionAgentNode.__init__()
-
-# Read ROS parameters
-agent_type = "planning" if self.use_planning else "openai"
-
-# Create agent via factory
-self.agent = AgentFactory.create(
-    agent_type=agent_type,
-    skills=self.skills,
-    robot=self.robot,
-    config={
-        "dev_name": "shadowhound",
-        "agent_type": "Mission",
-        "model": "gpt-4-turbo"
-    }
-)
-
-# Execute missions through unified interface
-def mission_callback(self, msg):
-    result: MissionResult = self.agent.execute_mission(msg.data)
-    
-    if result.status == MissionStatus.SUCCESS:
-        self.get_logger().info(f"Mission success: {result.message}")
-    else:
-        self.get_logger().error(f"Mission failed: {result.message}")
-```
-
-## Benefits of This Architecture
-
-### 1. **Testability**
-- Test agents without ROS, robot hardware, or DIMOS
-- Mock agents for integration testing
-- Isolated unit tests for each component
-
-```python
-# Example test
-def test_agent_execution():
-    agent = MockAgent()
-    result = agent.execute_mission("test command")
-    
-    assert result.status == MissionStatus.SUCCESS
-    assert len(result.skills_executed) == 1
-```
-
-### 2. **Extensibility**
-- Easy to add new agent types (local LLMs, custom planners, etc.)
-- Register custom agents without modifying core code
-- Swap agents via configuration
-
-```python
-# Add new agent type
-AgentFactory.register_agent_type("llamacpp", LlamaCppAgent)
-```
-
-### 3. **Observability**
-- Structured results with status, telemetry, and skill tracking
-- Better logging and debugging
-- Metrics for monitoring (execution time, token usage, etc.)
-
-### 4. **Separation of Concerns**
-- Agent logic decoupled from ROS orchestration
-- Mission node becomes thin layer for ROS integration
-- Agent implementations focus on AI/planning logic
-
-### 5. **Consistency**
-- All agents share same interface
-- Uniform error handling
-- Predictable behavior across agent types
-
-## Adding a New Agent Type
-
-Follow these steps to add a new agent implementation:
-
-### 1. Create Agent Class
-
-```python
-# In shadowhound_mission_agent/agent/my_custom_agent.py
-
-from .base_agent import BaseAgent, MissionResult, MissionStatus, SkillCall
-
-class MyCustomAgent(BaseAgent):
-    """My custom agent implementation."""
-    
-    def __init__(self, skills, robot, config):
-        super().__init__(skills, robot, config)
-        # Your initialization
-        self.model = config.get("model", "default")
-    
-    def execute_mission(self, command: str) -> MissionResult:
-        """Execute mission with custom logic."""
-        try:
-            # Your execution logic
-            skills_used = [...]
-            
-            return MissionResult(
-                status=MissionStatus.SUCCESS,
-                message=f"Completed: {command}",
-                skills_executed=skills_used,
-                telemetry={"execution_time": 1.2}
-            )
-        except Exception as e:
-            return MissionResult(
-                status=MissionStatus.FAILURE,
-                message=f"Error: {str(e)}"
-            )
-    
-    def plan_mission(self, command: str) -> list[SkillCall]:
-        """Generate plan (optional)."""
-        # Your planning logic
-        return []
-```
-
-### 2. Export from Module
-
-```python
-# In shadowhound_mission_agent/agent/__init__.py
-
-from .my_custom_agent import MyCustomAgent
-
-__all__ = [
-    # ... existing exports
-    "MyCustomAgent",
-]
-```
-
-### 3. Register with Factory
-
-```python
-# In shadowhound_mission_agent/agent/agent_factory.py
-
-from .my_custom_agent import MyCustomAgent
-
-_AGENT_TYPES = {
-    "openai": OpenAIAgent,
-    "planning": PlanningAgent,
-    "custom": MyCustomAgent,  # Add here
-}
-```
-
-### 4. Use in Configuration
-
-```python
-# Create agent
-agent = AgentFactory.create(
-    agent_type="custom",
-    skills=skills,
-    robot=robot,
-    config={"model": "my-model"}
-)
-
-# Or via config file
-config = {
-    "agent_type": "custom",
-    "model": "my-model"
-}
-agent = AgentFactory.from_config_dict(config)
-```
-
-## Configuration Examples
-
-### Using OpenAI Agent (Cloud)
-
-```python
-agent = AgentFactory.create(
-    agent_type="openai",
-    skills=skills,
-    robot=robot,
-    config={
-        "dev_name": "shadowhound",
-        "model": "gpt-4-turbo",  # or "gpt-3.5-turbo"
-    }
-)
-```
-
-Environment: `OPENAI_API_KEY=sk-...`
-
-### Using Planning Agent
-
-```python
-agent = AgentFactory.create(
-    agent_type="planning",
-    skills=skills,
-    robot=robot,
-    config={
-        "dev_name": "shadowhound",
-        "agent_type": "Planning",
-    }
-)
-```
-
-### Using Custom Local LLM
-
-```python
-# After registering custom agent
-agent = AgentFactory.create(
-    agent_type="llamacpp",
-    skills=skills,
-    robot=robot,
-    config={
-        "model_path": "/models/llama-7b.gguf",
-        "context_length": 2048,
-    }
-)
-```
-
-## Error Handling
-
-All agents should return structured results, never raise exceptions to the caller:
-
-```python
-def execute_mission(self, command: str) -> MissionResult:
-    try:
-        # Execution logic
-        return MissionResult(status=MissionStatus.SUCCESS, ...)
-    except SpecificError as e:
-        # Handle specific errors
-        return MissionResult(
-            status=MissionStatus.FAILURE,
-            message=f"Specific error: {e}"
-        )
-    except Exception as e:
-        # Catch-all for unexpected errors
-        return MissionResult(
-            status=MissionStatus.FAILURE,
-            message=f"Unexpected error: {e}",
-            telemetry={"error_type": type(e).__name__}
-        )
+    @skill(description="Take a photo with the robot's camera")
+    def capture_image(self) -> np.ndarray:
+        """Capture an image from robot camera."""
+        return self.robot.get_camera_image()
 ```
 
 ## Testing
 
-### Unit Testing Agents
+### Unit Tests (Fast, No ROS)
+
+Test `MissionExecutor` without ROS infrastructure:
 
 ```python
-# test/test_agent_module.py
+# test/test_mission_executor.py
+from shadowhound_mission_agent.mission_executor import MissionExecutor
 
-from shadowhound_mission_agent.agent import (
-    BaseAgent, MissionResult, MissionStatus, AgentFactory
+def test_config_defaults():
+    config = MissionExecutorConfig()
+    assert config.agent_backend == "cloud"
+    assert config.robot_ip == "192.168.1.103"
+
+def test_execute_mission_not_initialized():
+    executor = MissionExecutor(MissionExecutorConfig())
+    with pytest.raises(RuntimeError):
+        executor.execute_mission("test")
+```
+
+**Run**: `pytest src/shadowhound_mission_agent/test/test_mission_executor.py`
+
+**Results**: 10 passed, 4 skipped in 0.09s ⚡
+
+### Integration Tests (Requires DIMOS)
+
+Test with actual DIMOS framework:
+
+```python
+@pytest.mark.skipif(not DIMOS_AVAILABLE, reason="Requires DIMOS")
+def test_full_mission_execution():
+    config = MissionExecutorConfig()
+    executor = MissionExecutor(config)
+    executor.initialize()
+    result = executor.execute_mission("sit down")
+    assert "sit" in result.lower()
+    executor.cleanup()
+```
+
+## Benefits of This Architecture
+
+### ✅ Separation of Concerns
+
+**ROS Concerns** (MissionAgentNode):
+- Node lifecycle
+- Parameters
+- Topics
+- Logging
+
+**Business Logic** (MissionExecutor):
+- Robot control
+- Mission execution
+- Status queries
+
+### ✅ Testability
+
+**Before**: Tests required full ROS stack
+- Slow integration tests only
+- Hard to mock
+- Fragile
+
+**After**: Unit tests without ROS
+- Fast (0.09s)
+- Easy to mock
+- Reliable
+
+### ✅ Reusability
+
+**Use MissionExecutor in**:
+- ROS nodes (MissionAgentNode)
+- Jupyter notebooks (interactive development)
+- CLI scripts (batch operations)
+- Web applications (REST API)
+- Test scripts (validation)
+
+### ✅ Follows DIMOS Conventions
+
+**Key Insight**: DIMOS already provides:
+- Agent abstraction (`OpenAIAgent`, `PlanningAgent`)
+- Skill system (`MyUnitreeSkills`)
+- Robot interface (`UnitreeGo2`)
+
+**Our Role**: Use DIMOS components, extend via skills.
+
+**Not**: Create wrapper layers that duplicate DIMOS functionality.
+
+## Migration from Old Architecture
+
+If you have code using the old agent wrapper:
+
+### Before (Old Wrapper)
+```python
+from shadowhound_mission_agent.agent import AgentFactory, BaseAgent
+
+factory = AgentFactory(skills, robot, config)
+agent = factory.create("openai")
+result = agent.execute_mission("patrol")
+# Returns MissionResult dataclass
+```
+
+### After (DIMOS Direct)
+```python
+from shadowhound_mission_agent.mission_executor import (
+    MissionExecutor,
+    MissionExecutorConfig
 )
 
-def test_custom_agent():
-    """Test custom agent without ROS/robot."""
-    agent = AgentFactory.create(
-        agent_type="custom",
-        skills=MockSkills(),
-        robot=MockRobot(),
-        config={}
-    )
-    
-    result = agent.execute_mission("test command")
-    
-    assert result.status == MissionStatus.SUCCESS
-    assert result.message is not None
-    assert result.telemetry is not None
+config = MissionExecutorConfig(agent_backend="cloud")
+executor = MissionExecutor(config)
+executor.initialize()
+result = executor.execute_mission("patrol")
+# Returns string response
 ```
 
-### Integration Testing with ROS
+**Why**: The old wrapper was unnecessary - DIMOS already provides agent abstraction. See `docs/AGENT_REFACTOR_ANALYSIS.md` for full rationale.
+
+## Adding Vision Capabilities
+
+For vision integration strategy, see `docs/VISION_INTEGRATION_DESIGN.md`.
+
+**TL;DR**: Add vision as DIMOS skills (not agent types).
 
 ```python
-# Launch test node with mock agent
-node = MissionAgentNode()
-node.agent = MockAgent()  # Inject mock
-
-# Send mission command
-msg = String(data="Go forward")
-node.mission_callback(msg)
-
-# Verify result published to /mission_status
+class MyUnitreeSkills(Skills):
+    @skill(description="Analyze an image with VLM")
+    def analyze_scene(self) -> str:
+        image = self.robot.get_camera_image()
+        # Call VLM backend (GPT-4 Vision, Claude 3, etc.)
+        return vlm_client.analyze(image, "What do you see?")
 ```
+
+## Configuration
+
+### Environment Variables
+
+```bash
+# Connection type (webrtc for high-level API, cyclonedds for low-level)
+export CONN_TYPE=webrtc
+
+# Robot IP address
+export GO2_IP=192.168.1.103
+
+# OpenAI API key (for cloud backend)
+export OPENAI_API_KEY=sk-...
+```
+
+### ROS Parameters
+
+```yaml
+# config/mission_agent.yaml
+shadowhound_mission_agent:
+  ros__parameters:
+    agent_backend: "cloud"        # 'cloud' or 'local'
+    use_planning_agent: false     # Use PlanningAgent vs OpenAIAgent
+    robot_ip: "192.168.1.103"     # Robot IP
+    agent_model: "gpt-4-turbo"    # LLM model
+    enable_web_interface: true    # Enable web dashboard
+    web_port: 8080                # Web interface port
+```
+
+## Troubleshooting
+
+### "DIMOS not available"
+
+**Error**: `RuntimeError: DIMOS framework not available`
+
+**Solution**: Ensure `dimos-unitree` is in `PYTHONPATH`:
+```bash
+source install/setup.bash  # After colcon build
+```
+
+### "Robot not initialized"
+
+**Error**: `RuntimeError: Robot not initialized`
+
+**Cause**: Called method before `executor.initialize()`
+
+**Solution**:
+```python
+executor = MissionExecutor(config)
+executor.initialize()  # Must call before execute_mission()
+executor.execute_mission("patrol")
+```
+
+### "Skills not initialized"
+
+**Error**: `RuntimeError: Skills not initialized`
+
+**Cause**: Called method before initialization
+
+**Solution**: Same as above - call `executor.initialize()` first.
 
 ## Future Enhancements
 
-- **Vision-enabled agents**: Integrate GPT-4 Vision for image-based missions
-- **Local LLM support**: Add Llama, Mistral, etc. for offline operation
-- **Multi-agent coordination**: Agents that collaborate on complex missions
-- **Learning agents**: RL-based agents that improve over time
-- **Skill recommendation**: Agents suggest new skills based on mission patterns
+### Planned Features
+
+1. **Vision Skills** - Add VLM-powered perception skills
+2. **Async Execution** - Support for async mission execution
+3. **Mission Plans** - Structured plan generation and introspection
+4. **Skill Telemetry** - Per-skill execution metrics
+5. **Error Recovery** - Automatic retry and fallback strategies
+
+### Extension Points
+
+Want to extend the system? Add to DIMOS, not here:
+
+**Robot Skills**: Add to `MyUnitreeSkills` in DIMOS
+**New Agent Type**: Implement DIMOS agent interface
+**Custom Backend**: Add to DIMOS LLM client
 
 ## References
 
-- **Base Implementation**: `shadowhound_mission_agent/agent/base_agent.py`
-- **Factory Pattern**: `shadowhound_mission_agent/agent/agent_factory.py`
-- **OpenAI Wrapper**: `shadowhound_mission_agent/agent/openai_agent.py`
-- **Planning Wrapper**: `shadowhound_mission_agent/agent/planning_agent.py`
-- **Usage Example**: `shadowhound_mission_agent/mission_agent.py`
-- **Tests**: `test/test_agent_basic.py`
+- **DIMOS Framework**: `src/dimos-unitree/`
+- **Refactor Analysis**: `docs/AGENT_REFACTOR_ANALYSIS.md`
+- **Vision Integration**: `docs/VISION_INTEGRATION_DESIGN.md`
+- **Project Architecture**: `docs/project.md`
+- **Tests**: `src/shadowhound_mission_agent/test/test_mission_executor.py`
 
----
+## Summary
 
-**Last Updated**: 2025-01-05
-**Maintainer**: ShadowHound Development Team
+**Key Principles**:
+1. **Separate ROS from business logic** - Enables testing and reuse
+2. **Use DIMOS directly** - Don't wrap what's already abstracted
+3. **Extend via skills** - Skills are the extension point
+4. **Test without ROS** - Fast unit tests for business logic
+5. **Follow conventions** - Use framework patterns, don't fight them
+
+**Architecture Benefits**:
+- ✅ Testable without ROS (10 unit tests in 0.09s)
+- ✅ Reusable in non-ROS contexts (scripts, notebooks, web apps)
+- ✅ Follows DIMOS conventions (skills as extension point)
+- ✅ Clean separation of concerns (ROS vs business logic)
+- ✅ Easy to understand and maintain (292 lines each component)
