@@ -91,8 +91,16 @@ class MissionAgentNode(Node):
             String, "mission_command", self.mission_callback, 10
         )
 
+        # Subscribe to camera feed for web UI
+        self.camera_sub = self.create_subscription(
+            CompressedImage, "/camera/compressed", self.camera_callback, 10
+        )
+
         # Create ROS publishers
         self.status_pub = self.create_publisher(String, "mission_status", 10)
+
+        # Create timer for diagnostics updates (2 Hz)
+        self.diagnostics_timer = self.create_timer(0.5, self.update_diagnostics)
 
         self.get_logger().info("ShadowHound Mission Agent ready!")
 
@@ -213,6 +221,7 @@ class MissionAgentNode(Node):
             # Broadcast error to web clients
             if self.web:
                 self.web.broadcast_sync(f"❌ FAILED: {command} - {str(e)}")
+                self.web.add_terminal_line(f"❌ FAILED: {command} - {str(e)}")
 
             return {"success": False, "message": f"Mission failed: {str(e)}"}
 
@@ -248,6 +257,46 @@ class MissionAgentNode(Node):
             # Broadcast to web interface
             if self.web:
                 self.web.broadcast_sync(f"❌ FAILED: {command} - {str(e)}")
+                self.web.add_terminal_line(f"❌ FAILED: {command} - {str(e)}")
+
+
+    def camera_callback(self, msg: CompressedImage):
+        """Handle camera feed for web UI."""
+        if self.web:
+            # Forward compressed image data to web interface
+            self.web.update_camera_frame(bytes(msg.data))
+    
+    def update_diagnostics(self):
+        """Update diagnostics information for web UI."""
+        if not self.web:
+            return
+        
+        try:
+            # Get available topics
+            topic_names_and_types = self.get_topic_names_and_types()
+            robot_topics = [
+                name for name, types in topic_names_and_types
+                if any(keyword in name for keyword in [
+                    "go2", "camera", "imu", "odom", "costmap", "cmd_vel", "webrtc"
+                ])
+            ]
+            
+            # Get action servers (simplified - just check if nav2 actions exist)
+            action_servers = []
+            if any("/navigate_to_pose" in name for name, _ in topic_names_and_types):
+                action_servers.append("navigate_to_pose")
+            if any("/spin" in name for name, _ in topic_names_and_types):
+                action_servers.append("spin")
+            
+            # Update web interface
+            self.web.update_diagnostics({
+                "robot_mode": "operational",  # TODO: Get actual mode from robot state
+                "topics_available": robot_topics,
+                "action_servers": action_servers
+            })
+            
+        except Exception as e:
+            self.get_logger().debug(f"Diagnostics update error: {e}")
 
     def destroy_node(self):
         """Clean up resources."""
