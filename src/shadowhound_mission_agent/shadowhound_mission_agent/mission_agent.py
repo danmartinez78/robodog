@@ -72,12 +72,13 @@ class MissionAgentNode(Node):
             agent_model=agent_model,
         )
 
-        # Create executor (uses ROS logging via this node's logger)
-        self.executor = MissionExecutor(config, logger=self.get_logger())
+        # Create mission executor (uses ROS logging via this node's logger)
+        # Note: Named mission_executor to avoid conflict with ROS node's executor attribute
+        self.mission_executor = MissionExecutor(config, logger=self.get_logger())
 
-        # Initialize executor
+        # Initialize mission executor
         self.get_logger().info("Initializing MissionExecutor...")
-        self.executor.initialize()
+        self.mission_executor.initialize()
         self.get_logger().info("MissionExecutor ready!")
 
         # Initialize web interface (optional)
@@ -197,7 +198,7 @@ class MissionAgentNode(Node):
 
         try:
             # Delegate to MissionExecutor
-            response = self.executor.execute_mission(command)
+            response = self.mission_executor.execute_mission(command)
 
             # Broadcast the response to all web clients
             if self.web:
@@ -227,7 +228,7 @@ class MissionAgentNode(Node):
 
         try:
             # Delegate to MissionExecutor
-            response = self.executor.execute_mission(command)
+            response = self.mission_executor.execute_mission(command)
 
             # Publish result
             status.data = f"COMPLETED: {command} | Result: {response[:100]}"
@@ -259,12 +260,12 @@ class MissionAgentNode(Node):
             except Exception as e:
                 self.get_logger().warn(f"Error stopping web interface: {e}")
 
-        # Clean up executor
-        if self.executor:
+        # Clean up mission executor
+        if self.mission_executor:
             try:
-                self.executor.cleanup()
+                self.mission_executor.cleanup()
             except Exception as e:
-                self.get_logger().warn(f"Error cleaning up executor: {e}")
+                self.get_logger().warn(f"Error cleaning up mission executor: {e}")
 
         super().destroy_node()
 
