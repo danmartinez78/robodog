@@ -31,14 +31,14 @@ import logging
 from typing import Optional, Dict, Any
 from .web_interface import WebInterface
 
+# Import new agent architecture
+from .agent import AgentFactory, BaseAgent, MissionResult, MissionStatus
+
 # Import DIMOS components
 try:
-    from dimos.agents.agent import OpenAIAgent
-    from dimos.agents.planning_agent import PlanningAgent
     from dimos.robot.unitree.unitree_go2 import UnitreeGo2
     from dimos.robot.unitree.unitree_ros_control import UnitreeROSControl
     from dimos.robot.unitree.unitree_skills import MyUnitreeSkills
-    from dimos.skills.skills import SkillLibrary
 
     DIMOS_AVAILABLE = True
 except ImportError as e:
@@ -135,7 +135,7 @@ class MissionAgentNode(Node):
 
         # Initialize agent
         self.get_logger().info(f"Initializing {self.agent_backend} agent...")
-        self.agent: Optional[OpenAIAgent] = None
+        self.agent: Optional[BaseAgent] = None
         self._init_agent()
 
         # Initialize web interface (optional)
@@ -229,29 +229,35 @@ class MissionAgentNode(Node):
         self.get_logger().info("=" * 60)
 
     def _init_agent(self):
-        """Initialize the DIMOS agent based on configuration."""
+        """Initialize the DIMOS agent using AgentFactory."""
         try:
+            # Determine agent type
             if self.use_planning:
-                self.agent = PlanningAgent(
-                    robot=self.robot, dev_name="shadowhound", agent_type="Planning"
-                )
-                self.get_logger().info("PlanningAgent initialized")
+                agent_type = "planning"
             else:
-                # Basic OpenAI agent
+                agent_type = "openai"
+
+            # Check for API key if using cloud backend
+            if self.agent_backend == "cloud":
                 api_key = os.getenv("OPENAI_API_KEY")
                 if not api_key:
                     self.get_logger().warn(
                         "OPENAI_API_KEY not set, agent may not function"
                     )
 
-                # OpenAIAgent doesn't take 'robot' parameter directly
-                # Robot is accessed through the skills library
-                self.agent = OpenAIAgent(
-                    dev_name="shadowhound",
-                    agent_type="Mission",
-                    skills=self.skills,
-                )
-                self.get_logger().info("OpenAIAgent initialized")
+            # Create agent using factory
+            self.agent = AgentFactory.create(
+                agent_type=agent_type,
+                skills=self.skills,
+                robot=self.robot,
+                config={
+                    "dev_name": "shadowhound",
+                    "agent_type": "Mission",
+                    "model": "gpt-4-turbo",  # Can be overridden via config
+                },
+            )
+
+            self.get_logger().info(f"Agent initialized: {agent_type}")
 
         except Exception as e:
             self.get_logger().error(f"Failed to initialize agent: {e}")
@@ -285,21 +291,28 @@ class MissionAgentNode(Node):
         self.get_logger().info(f"🌐 Web command: {command}")
 
         try:
-            # Execute through agent (same as ROS topic commands)
-            if self.use_planning:
-                result = self.agent.plan_and_execute(command)
-            else:
-                # OpenAIAgent uses run_observable_query() which returns an Observable
-                # Call .run() to execute synchronously and get the result
-                result = self.agent.run_observable_query(command).run()
+            # Execute through agent using unified interface
+            result: MissionResult = self.agent.execute_mission(command)
 
             # Broadcast the actual response to all web clients
             if self.web:
-                # Show the agent's response, not just generic completion message
-                response_preview = result[:200] if len(result) > 200 else result
-                self.web.broadcast_sync(f"✅ {response_preview}")
+                if result.status == MissionStatus.SUCCESS:
+                    msg = result.message or "Mission completed successfully"
+                    response_preview = msg[:200] if len(msg) > 200 else msg
+                    self.web.broadcast_sync(f"✅ {response_preview}")
 
-            return {"success": True, "message": result}
+                    # Log telemetry if available
+                    if result.telemetry:
+                        self.get_logger().info(f"Telemetry: {result.telemetry}")
+                else:
+                    self.web.broadcast_sync(f"FAILED: {command} - {result.message}")
+
+            return {
+                "success": result.status == MissionStatus.SUCCESS,
+                "message": result.message or "No response",
+                "skills_executed": len(result.skills_executed),
+                "skills_failed": len(result.skills_failed),
+            }
 
         except Exception as e:
             self.get_logger().error(f"Web mission failed: {e}")
@@ -321,25 +334,37 @@ class MissionAgentNode(Node):
         self.status_pub.publish(status)
 
         try:
-            # Execute mission through agent
-            if self.use_planning:
-                # Planning agent creates and executes a plan
-                result = self.agent.plan_and_execute(command)
-            else:
-                # Basic agent processes command directly
-                # OpenAIAgent uses run_observable_query() which returns an Observable
-                # Call .run() to execute synchronously and get the result
-                result = self.agent.run_observable_query(command).run()
+            # Execute mission through agent using unified interface
+            result: MissionResult = self.agent.execute_mission(command)
 
             # Publish result
-            status.data = f"COMPLETED: {command} | Result: {result}"
+            if result.status == MissionStatus.SUCCESS:
+                msg_text = result.message or "Mission completed successfully"
+                status.data = f"COMPLETED: {command} | Result: {msg_text}"
+                self.get_logger().info(
+                    f"Mission completed: {result.skills_executed} skills executed"
+                )
+
+                # Log telemetry if available
+                if result.telemetry:
+                    self.get_logger().info(f"Telemetry: {result.telemetry}")
+            else:
+                status.data = f"FAILED: {command} | Error: {result.message}"
+                self.get_logger().error(
+                    f"Mission failed: {result.message} "
+                    f"({len(result.skills_failed)} skills failed)"
+                )
+
             self.status_pub.publish(status)
-            self.get_logger().info(f"Mission completed: {result}")
 
             # Broadcast to web interface with actual response
             if self.web:
-                response_preview = result[:200] if len(result) > 200 else result
-                self.web.broadcast_sync(f"✅ {response_preview}")
+                if result.status == MissionStatus.SUCCESS:
+                    msg_text = result.message or "Mission completed successfully"
+                    response_preview = msg_text[:200] if len(msg_text) > 200 else msg_text
+                    self.web.broadcast_sync(f"✅ {response_preview}")
+                else:
+                    self.web.broadcast_sync(f"FAILED: {command} - {result.message}")
 
         except Exception as e:
             self.get_logger().error(f"Mission failed: {e}")
