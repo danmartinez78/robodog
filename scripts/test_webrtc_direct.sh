@@ -8,7 +8,7 @@
 #
 # Prerequisites:
 #   - Robot connected to WiFi network
-#   - GO2_IP set to robot's WiFi IP address
+#   - ROBOT_IP set to robot's WiFi IP address
 #   - CONN_TYPE=webrtc
 #
 # ============================================================================

@@ -497,8 +497,10 @@ setup_config() {
         print_info "Using MOCK robot mode (no hardware needed)"
     else
         print_info "Using REAL robot mode"
+        # Use ROBOT_IP (aligned with ROS2 SDK)
         if [ -z "$ROBOT_IP" ]; then
-            print_warning "ROBOT_IP not set, using default: 192.168.1.103"
+            export ROBOT_IP="192.168.10.167"  # Default IP
+            print_warning "ROBOT_IP not set, using default: $ROBOT_IP"
         else
             print_success "Robot IP: $ROBOT_IP"
         fi
@@ -678,14 +680,14 @@ check_network() {
     
     print_section "Network Check"
     
-    local go2_ip=${GO2_IP:-192.168.1.103}
+    local robot_ip=${ROBOT_IP:-192.168.10.167}
     
-    print_info "Checking connection to robot at $go2_ip..."
+    print_info "Checking connection to robot at $robot_ip..."
     
-    if ping -c 1 -W 2 "$go2_ip" &> /dev/null; then
-        print_success "Robot is reachable at $go2_ip"
+    if ping -c 1 -W 2 "$robot_ip" &> /dev/null; then
+        print_success "Robot is reachable at $robot_ip"
     else
-        print_warning "Cannot reach robot at $go2_ip"
+        print_warning "Cannot reach robot at $robot_ip"
         print_info "This is OK if you're using mock mode"
         
         read -p "Continue anyway? [y/N]: " continue_choice
@@ -710,7 +712,7 @@ show_summary() {
 #   source .shadowhound_env
 
 export ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
-export GO2_IP=${GO2_IP:-192.168.10.167}
+export ROBOT_IP=${ROBOT_IP:-192.168.10.167}
 export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
 
 # Connection type for Unitree Go2 (cyclonedds for Ethernet, webrtc for WiFi)
@@ -729,7 +731,7 @@ fi
 
 echo "✓ ShadowHound environment loaded"
 echo "  ROS_DOMAIN_ID: \$ROS_DOMAIN_ID"
-echo "  GO2_IP: \$GO2_IP"
+echo "  ROBOT_IP: \$ROBOT_IP"
 echo "  CONN_TYPE: \$CONN_TYPE"
 EOF
     
@@ -776,16 +778,13 @@ launch_robot_driver() {
     
     print_section "Stage 1: Launching Robot Driver"
     
-    local go2_ip=${GO2_IP:-192.168.10.167}
-    
-    # SDK launch file reads ROBOT_IP environment variable
-    # Export ROBOT_IP=$GO2_IP for SDK compatibility
-    export ROBOT_IP=$go2_ip
+    local robot_ip=${ROBOT_IP:-192.168.10.167}
+    export ROBOT_IP=$robot_ip
     
     # Ping robot one more time
-    print_info "Verifying robot connectivity at $go2_ip..."
-    if ! ping -c 1 -W 2 "$go2_ip" &> /dev/null; then
-        print_error "Robot not reachable at $go2_ip"
+    print_info "Verifying robot connectivity at $robot_ip..."
+    if ! ping -c 1 -W 2 "$robot_ip" &> /dev/null; then
+        print_error "Robot not reachable at $robot_ip"
         print_info "Make sure robot is powered on and connected"
         return 1
     fi

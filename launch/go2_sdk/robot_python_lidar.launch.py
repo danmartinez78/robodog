@@ -17,7 +17,7 @@ def generate_launch_description():
     # Declare launch arguments
     robot_ip_arg = DeclareLaunchArgument(
         "robot_ip",
-        default_value=os.getenv("GO2_IP", "192.168.1.103"),
+        default_value=os.getenv("ROBOT_IP", "192.168.1.103"),
         description="IP address of the Go2 robot",
     )
 

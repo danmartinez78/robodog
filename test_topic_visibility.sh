@@ -14,10 +14,10 @@ source /workspaces/shadowhound/install/setup.bash
 
 # Set environment
 export PYTHONPATH="/workspaces/shadowhound/src/dimos-unitree:$PYTHONPATH"
-export GO2_IP="${GO2_IP:-192.168.10.167}"
+export ROBOT_IP="${ROBOT_IP:-192.168.10.167}"
 
 echo "Environment:"
-echo "  GO2_IP: $GO2_IP"
+echo "  ROBOT_IP: $ROBOT_IP"
 echo "  ROS_DOMAIN_ID: ${ROS_DOMAIN_ID:-0}"
 echo ""
 

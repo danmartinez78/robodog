@@ -45,7 +45,7 @@ else
     echo -e "${YELLOW}⚠${NC} Using default values"
     
     export ROS_DOMAIN_ID=0
-    export GO2_IP=${GO2_IP:-192.168.10.167}
+    export ROBOT_IP=${ROBOT_IP:-192.168.10.167}
     export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
     
     # Source ROS2
@@ -68,7 +68,7 @@ fi
 echo ""
 echo "Environment:"
 echo "  • ROS_DOMAIN_ID: $ROS_DOMAIN_ID"
-echo "  • GO2_IP: $GO2_IP"
+echo "  • ROBOT_IP: $ROBOT_IP"
 echo "  • RMW: $RMW_IMPLEMENTATION"
 echo ""
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"

@@ -31,7 +31,7 @@ echo ""
 if [ -f "$ENV_FILE" ]; then
     echo -e "${BLUE}Current configuration in $ENV_FILE:${NC}"
     echo ""
-    grep -E "^GO2_IP=|^CONN_TYPE=|^ROS_DOMAIN_ID=" "$ENV_FILE" | sed 's/^/  /'
+    grep -E "^ROBOT_IP=|^CONN_TYPE=|^ROS_DOMAIN_ID=" "$ENV_FILE" | sed 's/^/  /'
     echo ""
     read -p "Reconfigure? [y/N]: " reconfigure
     if [[ "$reconfigure" != "y" && "$reconfigure" != "Y" ]]; then
@@ -63,10 +63,6 @@ echo ""
 CURRENT_IP=""
 if [ -f ".env" ]; then
     CURRENT_IP=$(grep "^ROBOT_IP=" .env 2>/dev/null | cut -d= -f2)
-    # Fallback to GO2_IP for backward compatibility
-    if [ -z "$CURRENT_IP" ]; then
-        CURRENT_IP=$(grep "^GO2_IP=" .env 2>/dev/null | cut -d= -f2)
-    fi
 fi
 
 if [ -n "$CURRENT_IP" ]; then
