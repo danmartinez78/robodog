@@ -1,0 +1,169 @@
+# ShadowHound TODO List
+
+**Last Updated**: 2025-10-06
+
+---
+
+## 🔴 High Priority
+
+### Agent System
+- [ ] Add vision integration to mission executor
+  - Use VLM for visual context in planning
+  - Test with camera feed from robot
+  - Related: `docs/VISION_INTEGRATION_DESIGN.md`
+
+- [ ] Implement remaining unit tests (4 skipped tests)
+  - Test mission pause/resume functionality
+  - Test error recovery scenarios
+  - Test telemetry collection
+
+- [ ] Add mission history and replay capability
+  - Store mission execution logs
+  - Allow replaying past missions
+  - Export mission data for analysis
+
+### Robot Integration
+- [ ] Validate all 47 skills on hardware
+  - Systematic testing of each skill
+  - Document any issues or limitations
+  - Create skill test suite
+
+- [ ] Improve error handling in robot interface
+  - Better timeout management
+  - Graceful degradation when skills fail
+  - Recovery strategies
+
+### Testing & Quality
+- [ ] Add integration tests for full mission flow
+  - End-to-end mission execution
+  - Test with mock robot and real robot
+  - Automated regression testing
+
+- [ ] Set up continuous integration (CI)
+  - Automated builds on commits
+  - Run unit tests automatically
+  - Code quality checks (linting, formatting)
+
+---
+
+## 🟡 Medium Priority
+
+### Documentation
+- [ ] Create video walkthrough of system
+  - Architecture overview
+  - How to write a mission
+  - Debugging tips
+
+- [ ] Document all 47 skills
+  - Parameters, return values, examples
+  - Success/failure scenarios
+  - Performance characteristics
+
+- [ ] Update README with latest architecture
+  - Reflect MissionExecutor changes
+  - Update setup instructions
+  - Add troubleshooting section
+
+### Features
+- [ ] Add mission templates
+  - Common mission patterns
+  - Reusable mission components
+  - Template library
+
+- [ ] Implement mission composition
+  - Combine simple missions into complex ones
+  - Mission scripting language
+  - Conditional execution
+
+- [ ] Add telemetry dashboard
+  - Real-time mission status
+  - Performance metrics
+  - Historical data visualization
+
+### DevOps
+- [ ] Optimize Docker build times
+  - Multi-stage builds
+  - Better layer caching
+  - Reduce image size
+
+- [ ] Create deployment scripts
+  - One-command deployment
+  - Environment validation
+  - Health checks
+
+---
+
+## 🟢 Low Priority / Nice to Have
+
+### Enhancements
+- [ ] Add voice command support
+  - Natural language mission input
+  - Voice feedback from robot
+  - Integration with speech processor
+
+- [ ] Create mobile app for mission control
+  - Remote mission triggering
+  - Status monitoring
+  - Emergency stop
+
+- [ ] Add simulation environment
+  - Test missions without robot
+  - Gazebo integration
+  - Synthetic camera feeds
+
+### Code Quality
+- [ ] Increase test coverage to >90%
+  - Add more unit tests
+  - Integration test coverage
+  - Coverage reporting
+
+- [ ] Add type checking in CI
+  - mypy validation
+  - Strict type hints
+  - Type documentation
+
+- [ ] Performance profiling
+  - Identify bottlenecks
+  - Optimize hot paths
+  - Memory usage analysis
+
+---
+
+## ✅ Recently Completed
+
+### 2025-10-06
+- ✅ Agent refactor: Separate ROS concerns from business logic
+- ✅ Create MissionExecutor (pure Python)
+- ✅ Simplify MissionAgentNode (thin wrapper)
+- ✅ Add 14 unit tests for MissionExecutor
+- ✅ Update AGENT_ARCHITECTURE.md documentation
+- ✅ Fix executor naming conflict with ROS2 Node
+- ✅ Fix model parameter name for DIMOS
+- ✅ Add configurable token limits
+- ✅ Validate on robot (47 skills loaded)
+- ✅ Merge feature/agent-refactor into feature/dimos-integration
+
+---
+
+## 📋 Task Categories
+
+### Legend
+- 🔴 **High Priority**: Critical for next milestone or blocking other work
+- 🟡 **Medium Priority**: Important but not urgent
+- 🟢 **Low Priority**: Nice to have, can wait
+- ✅ **Completed**: Done and validated
+
+### Adding New Tasks
+When adding tasks, include:
+1. **Clear title**: What needs to be done
+2. **Context**: Why it's needed
+3. **Acceptance criteria**: How to verify completion
+4. **Related files/docs**: Links to relevant code or documentation
+
+Example:
+```markdown
+- [ ] Task title
+  - Context: Why this is needed
+  - Acceptance: How to verify it's done
+  - Related: `path/to/file.py`, `docs/doc.md`
+```
