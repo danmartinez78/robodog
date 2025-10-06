@@ -1,12 +1,17 @@
 <!DOCTYPE html>
 <html>
+
 <head>
     <title>🐕 ShadowHound Mission Control</title>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
         body {
             font-family: 'Courier New', 'Monaco', monospace;
             background: #0d0d0d;
@@ -15,30 +20,30 @@
             padding: 20px;
             overflow-x: hidden;
         }
-        
+
         .container {
             max-width: 1600px;
             margin: 0 auto;
         }
-        
+
         .header {
             text-align: center;
             color: #5cb85c;
             margin-bottom: 30px;
             text-shadow: 0 0 10px rgba(92, 184, 92, 0.5);
         }
-        
+
         .header h1 {
             font-size: 3em;
             margin-bottom: 10px;
             letter-spacing: 3px;
         }
-        
+
         .header p {
             font-size: 1.2em;
             opacity: 0.8;
         }
-        
+
         .connection-status {
             display: inline-block;
             padding: 5px 15px;
@@ -48,32 +53,32 @@
             font-weight: 600;
             margin-top: 10px;
         }
-        
+
         .connected {
             border-color: #5cb85c;
             color: #5cb85c;
             background: rgba(92, 184, 92, 0.1);
         }
-        
+
         .disconnected {
             border-color: #d9534f;
             color: #d9534f;
             background: rgba(217, 83, 79, 0.1);
         }
-        
+
         .grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
             gap: 20px;
             margin-bottom: 20px;
         }
-        
+
         @media (max-width: 1024px) {
             .grid {
                 grid-template-columns: 1fr;
             }
         }
-        
+
         .panel {
             background: #1a1a1a;
             border: 1px solid #333;
@@ -81,7 +86,7 @@
             padding: 20px;
             box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
         }
-        
+
         .panel h2 {
             color: #5cb85c;
             margin-bottom: 15px;
@@ -89,7 +94,7 @@
             border-bottom: 1px solid #333;
             padding-bottom: 10px;
         }
-        
+
         .video-feed {
             width: 100%;
             height: 400px;
@@ -101,47 +106,47 @@
             color: #666;
             font-size: 1.2em;
         }
-        
+
         .video-feed img {
             width: 100%;
             height: 100%;
             object-fit: contain;
         }
-        
+
         .diagnostics-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
             gap: 15px;
             margin-top: 15px;
         }
-        
+
         .diag-item {
             background: #0d0d0d;
             border: 1px solid #333;
             padding: 15px;
             border-radius: 3px;
         }
-        
+
         .diag-label {
             color: #888;
             font-size: 0.9em;
             margin-bottom: 5px;
         }
-        
+
         .diag-value {
             color: #5cb85c;
             font-size: 1.2em;
             font-weight: bold;
         }
-        
+
         .diag-value.error {
             color: #d9534f;
         }
-        
+
         .diag-value.warning {
             color: #f0ad4e;
         }
-        
+
         .terminal {
             background: #000;
             border: 1px solid #333;
@@ -153,33 +158,33 @@
             font-size: 0.9em;
             line-height: 1.4;
         }
-        
+
         .terminal::-webkit-scrollbar {
             width: 10px;
         }
-        
+
         .terminal::-webkit-scrollbar-track {
             background: #0d0d0d;
         }
-        
+
         .terminal::-webkit-scrollbar-thumb {
             background: #333;
             border-radius: 5px;
         }
-        
+
         .terminal::-webkit-scrollbar-thumb:hover {
             background: #444;
         }
-        
+
         .terminal-line {
             color: #5cb85c;
             margin-bottom: 2px;
         }
-        
+
         .terminal-prompt {
             color: #888;
         }
-        
+
         .status-box {
             background: #0d0d0d;
             border-left: 3px solid #5cb85c;
@@ -189,7 +194,7 @@
             min-height: 60px;
             font-size: 1.1em;
         }
-        
+
         .command-input {
             width: 100%;
             padding: 15px;
@@ -201,17 +206,17 @@
             font-size: 1.1em;
             transition: border-color 0.3s;
         }
-        
+
         .command-input:focus {
             outline: none;
             border-color: #5cb85c;
             box-shadow: 0 0 10px rgba(92, 184, 92, 0.3);
         }
-        
+
         .command-input::placeholder {
             color: #555;
         }
-        
+
         .btn {
             padding: 12px 25px;
             border: 1px solid;
@@ -224,48 +229,48 @@
             background: transparent;
             font-family: 'Courier New', monospace;
         }
-        
+
         .btn-primary {
             border-color: #5cb85c;
             color: #5cb85c;
         }
-        
+
         .btn-primary:hover {
             background: #5cb85c;
             color: #000;
             box-shadow: 0 0 15px rgba(92, 184, 92, 0.5);
         }
-        
+
         .btn-secondary {
             border-color: #666;
             color: #888;
         }
-        
+
         .btn-secondary:hover {
             border-color: #5cb85c;
             color: #5cb85c;
         }
-        
+
         .quick-commands {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
             gap: 10px;
             margin-top: 20px;
         }
-        
+
         h3 {
             color: #888;
             margin: 20px 0 10px 0;
             font-size: 1.1em;
         }
-        
+
         .topic-list {
             display: flex;
             flex-wrap: wrap;
             gap: 10px;
             margin-top: 10px;
         }
-        
+
         .topic-badge {
             background: #0d0d0d;
             border: 1px solid #333;
@@ -274,13 +279,14 @@
             font-size: 0.85em;
             color: #5cb85c;
         }
-        
+
         .topic-badge.unavailable {
             color: #d9534f;
             border-color: #d9534f;
         }
     </style>
 </head>
+
 <body>
     <div class="container">
         <div class="header">
@@ -288,7 +294,7 @@
             <p>AUTONOMOUS ROBOT MISSION CONTROL</p>
             <span id="wsStatus" class="connection-status disconnected">CONNECTING...</span>
         </div>
-        
+
         <div class="grid">
             <!-- Camera Feed -->
             <div class="panel">
@@ -297,7 +303,7 @@
                     <span>NO FEED AVAILABLE</span>
                 </div>
             </div>
-            
+
             <!-- Diagnostics -->
             <div class="panel">
                 <h2>📊 DIAGNOSTICS</h2>
@@ -325,7 +331,7 @@
                 </div>
             </div>
         </div>
-        
+
         <div class="grid">
             <!-- Terminal -->
             <div class="panel">
@@ -336,7 +342,7 @@
                     </div>
                 </div>
             </div>
-            
+
             <!-- Mission Status -->
             <div class="panel">
                 <h2>📡 MISSION STATUS</h2>
@@ -345,20 +351,16 @@
                 </div>
             </div>
         </div>
-        
+
         <!-- Command Center -->
         <div class="panel">
             <h2>🎮 COMMAND CENTER</h2>
             <h3>Custom Command</h3>
-            <input 
-                type="text" 
-                id="commandInput" 
-                class="command-input" 
+            <input type="text" id="commandInput" class="command-input"
                 placeholder="Enter mission command (e.g., 'stand up and wave hello')"
-                onkeypress="if(event.key === 'Enter') sendCommand()"
-            >
+                onkeypress="if(event.key === 'Enter') sendCommand()">
             <button class="btn btn-primary" onclick="sendCommand()">▶️ EXECUTE</button>
-            
+
             <h3>Quick Commands</h3>
             <div class="quick-commands">
                 <button class="btn btn-secondary" onclick="sendQuick('stand up')">🧍 STAND</button>
@@ -370,7 +372,7 @@
             </div>
         </div>
     </div>
-    
+
     <script>
         let ws;
         const statusDiv = document.getElementById('status');
@@ -383,42 +385,42 @@
         const actionCount = document.getElementById('actionCount');
         const lastUpdate = document.getElementById('lastUpdate');
         const topicList = document.getElementById('topicList');
-        
+
         // WebSocket connection
         function connectWebSocket() {
             const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
             ws = new WebSocket(`${protocol}//${window.location.host}/ws/status`);
-            
+
             ws.onopen = () => {
                 console.log('WebSocket connected');
                 wsStatusSpan.textContent = 'CONNECTED';
                 wsStatusSpan.className = 'connection-status connected';
             };
-            
+
             ws.onmessage = (event) => {
                 console.log('Status update:', event.data);
                 addTerminalLine(event.data);
                 statusDiv.textContent = event.data;
             };
-            
+
             ws.onclose = () => {
                 console.log('WebSocket disconnected');
                 wsStatusSpan.textContent = 'DISCONNECTED';
                 wsStatusSpan.className = 'connection-status disconnected';
                 setTimeout(connectWebSocket, 3000);
             };
-            
+
             ws.onerror = (error) => {
                 console.error('WebSocket error:', error);
             };
         }
-        
+
         // Update camera feed
         async function updateCamera() {
             try {
                 const response = await fetch('/api/camera/latest');
                 const data = await response.json();
-                
+
                 if (data.available && data.image) {
                     cameraFeed.innerHTML = `<img src="data:image/jpeg;base64,${data.image}" alt="Camera Feed">`;
                 } else {
@@ -428,27 +430,27 @@
                 console.error('Camera update error:', error);
             }
         }
-        
+
         // Update diagnostics
         async function updateDiagnostics() {
             try {
                 const response = await fetch('/api/diagnostics');
                 const data = await response.json();
-                
+
                 robotMode.textContent = (data.robot_mode || 'UNKNOWN').toUpperCase();
                 topicsCount.textContent = data.topics_available ? data.topics_available.length : 0;
                 actionCount.textContent = data.action_servers ? data.action_servers.length : 0;
-                
+
                 if (data.last_update) {
                     const time = new Date(data.last_update).toLocaleTimeString();
                     lastUpdate.textContent = time;
                 } else {
                     lastUpdate.textContent = 'NEVER';
                 }
-                
+
                 // Update topic list
                 if (data.topics_available && data.topics_available.length > 0) {
-                    topicList.innerHTML = data.topics_available.map(topic => 
+                    topicList.innerHTML = data.topics_available.map(topic =>
                         `<span class="topic-badge">${topic}</span>`
                     ).join('');
                 } else {
@@ -458,15 +460,15 @@
                 console.error('Diagnostics update error:', error);
             }
         }
-        
+
         // Update terminal
         async function updateTerminal() {
             try {
                 const response = await fetch('/api/terminal');
                 const data = await response.json();
-                
+
                 if (data.lines && data.lines.length > 0) {
-                    terminal.innerHTML = data.lines.map(line => 
+                    terminal.innerHTML = data.lines.map(line =>
                         `<div class="terminal-line">${escapeHtml(line)}</div>`
                     ).join('');
                     terminal.scrollTop = terminal.scrollHeight;
@@ -475,7 +477,7 @@
                 console.error('Terminal update error:', error);
             }
         }
-        
+
         function addTerminalLine(text) {
             const timestamp = new Date().toLocaleTimeString();
             const line = document.createElement('div');
@@ -484,13 +486,13 @@
             terminal.appendChild(line);
             terminal.scrollTop = terminal.scrollHeight;
         }
-        
+
         function escapeHtml(text) {
             const div = document.createElement('div');
             div.textContent = text;
             return div.innerHTML;
         }
-        
+
         // Send command via REST API
         async function sendCommand() {
             const command = commandInput.value.trim();
@@ -498,25 +500,25 @@
                 alert('Please enter a command');
                 return;
             }
-            
+
             sendQuick(command);
             commandInput.value = '';
         }
-        
+
         async function sendQuick(command) {
             statusDiv.textContent = `⏳ Sending: ${command}`;
             addTerminalLine(`> ${command}`);
-            
+
             try {
                 const response = await fetch('/api/mission', {
                     method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({command: command})
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ command: command })
                 });
-                
+
                 const data = await response.json();
                 console.log('Response:', data);
-                
+
                 if (data.success) {
                     statusDiv.textContent = `✅ ${data.message}`;
                     addTerminalLine(`✅ SUCCESS: ${data.message}`);
@@ -530,19 +532,20 @@
                 addTerminalLine(`❌ EXCEPTION: ${error.message}`);
             }
         }
-        
+
         // Initialize
         connectWebSocket();
-        
+
         // Poll for updates
         setInterval(updateCamera, 1000);        // 1 FPS camera
         setInterval(updateDiagnostics, 2000);   // 0.5 Hz diagnostics
         setInterval(updateTerminal, 1000);      // 1 Hz terminal
-        
+
         // Initial updates
         updateCamera();
         updateDiagnostics();
         updateTerminal();
     </script>
 </body>
+
 </html>

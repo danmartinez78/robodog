@@ -79,6 +79,21 @@ class WebInterface:
         # WebSocket connections for real-time status updates
         self.active_connections: list[WebSocket] = []
 
+        # Camera feed storage (latest frame)
+        self.latest_camera_frame: Optional[bytes] = None
+
+        # Diagnostics data
+        self.diagnostics = {
+            "robot_mode": "unknown",
+            "topics_available": [],
+            "action_servers": [],
+            "last_update": None
+        }
+
+        # Terminal buffer for command history
+        self.terminal_buffer = []
+        self.max_terminal_lines = 1000
+
         # Mock image storage (for testing without robot)
         self.mock_images: Dict[str, bytes] = {}  # camera -> image_data
         self.mock_image_dir = Path.home() / ".shadowhound" / "mock_images"
@@ -222,506 +237,47 @@ class WebInterface:
                 self.active_connections.remove(websocket)
                 self.logger.info("WebSocket client disconnected")
 
+
+        @app.get("/api/camera/latest")
+        async def get_camera_frame():
+            """Get latest camera frame as base64 encoded image."""
+            if self.latest_camera_frame:
+                b64_image = base64.b64encode(self.latest_camera_frame).decode('utf-8')
+                return {"image": b64_image, "available": True}
+            return {"image": None, "available": False}
+        
+        @app.get("/api/diagnostics")
+        async def get_diagnostics():
+            """Get robot diagnostics information."""
+            return self.diagnostics
+        
+        @app.get("/api/terminal")
+        async def get_terminal():
+            """Get terminal buffer."""
+            return {"lines": self.terminal_buffer[-100:]}
+
         return app
 
     def _get_dashboard_html(self) -> str:
         """Generate dashboard HTML."""
-        return """
+        # Read from template file
+        template_path = Path(__file__).parent / "dashboard_template.html"
+        if template_path.exists():
+            return template_path.read_text()
+        else:
+            # Fallback to simple HTML if template not found
+            return """
 <!DOCTYPE html>
 <html>
-<head>
-    <title>shadowhound mission control</title>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        
-        body {
-            font-family: 'Courier New', 'Monaco', monospace;
-            background: #1a1a1a;
-            color: #c0c0c0;
-            min-height: 100vh;
-            padding: 20px;
-        }
-        
-        .container {
-            max-width: 1600px;
-            margin: 0 auto;
-        }
-        
-        .header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 15px 20px;
-            background: #0d0d0d;
-            border: 1px solid #333;
-            margin-bottom: 20px;
-        }
-        
-        .header-left h1 {
-            font-size: 1.5em;
-            color: #5cb85c;
-            letter-spacing: 2px;
-            margin-bottom: 5px;
-        }
-        
-        .header-left .subtitle {
-            font-size: 0.85em;
-            color: #666;
-        }
-        
-        .header-right {
-            text-align: right;
-        }
-        
-        .connection-status {
-            display: inline-block;
-            padding: 6px 12px;
-            border: 1px solid;
-            font-size: 0.85em;
-            font-weight: bold;
-        }
-        
-        .connected {
-            background: #0d0d0d;
-            color: #5cb85c;
-            border-color: #5cb85c;
-        }
-        
-        .disconnected {
-            background: #0d0d0d;
-            color: #ff0000;
-            border-color: #ff0000;
-        }
-        
-        .main-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            grid-template-rows: auto auto;
-            gap: 20px;
-            margin-bottom: 20px;
-        }
-        
-        .panel {
-            background: #0d0d0d;
-            border: 1px solid #333;
-            padding: 20px;
-        }
-        
-        .panel-header {
-            font-size: 0.9em;
-            color: #5cb85c;
-            margin-bottom: 15px;
-            padding-bottom: 10px;
-            border-bottom: 1px solid #333;
-        }
-        
-        .camera-panel {
-            grid-column: 1;
-            grid-row: 1;
-            min-height: 400px;
-        }
-        
-        .camera-feed {
-            width: 100%;
-            aspect-ratio: 16/9;
-            background: #000;
-            border: 1px solid #333;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            position: relative;
-            overflow: hidden;
-        }
-        
-        .camera-feed img {
-            width: 100%;
-            height: 100%;
-            object-fit: contain;
-        }
-        
-        .camera-placeholder {
-            color: #333;
-            font-size: 1.2em;
-            text-align: center;
-        }
-        
-        .upload-panel {
-            margin-top: 15px;
-            padding: 15px;
-            background: #1a1a1a;
-            border: 1px solid #333;
-        }
-        
-        .upload-label {
-            font-size: 0.85em;
-            color: #888;
-            margin-bottom: 10px;
-            display: block;
-        }
-        
-        .file-input-wrapper {
-            position: relative;
-            display: inline-block;
-            width: 100%;
-        }
-        
-        .file-input-wrapper input[type="file"] {
-            position: absolute;
-            opacity: 0;
-            width: 100%;
-            height: 100%;
-            cursor: pointer;
-        }
-        
-        .file-input-button {
-            display: block;
-            width: 100%;
-            padding: 12px;
-            background: #0d0d0d;
-            border: 1px dashed #555;
-            color: #c0c0c0;
-            font-family: 'Courier New', monospace;
-            font-size: 0.9em;
-            text-align: center;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-        
-        .file-input-button:hover {
-            background: #1a1a1a;
-            border-color: #888;
-        }
-        
-        .mission-panel {
-            grid-column: 2;
-            grid-row: 1 / span 2;
-            display: flex;
-            flex-direction: column;
-        }
-        
-        .status-display {
-            flex: 1;
-            background: #000;
-            border: 1px solid #333;
-            padding: 15px;
-            font-family: 'Courier New', monospace;
-            font-size: 0.9em;
-            color: #c0c0c0;
-            overflow-y: auto;
-            max-height: 300px;
-            margin-bottom: 20px;
-        }
-        
-        .status-display .log-entry {
-            padding: 3px 0;
-            line-height: 1.5;
-        }
-        
-        .command-input {
-            width: 100%;
-            padding: 12px;
-            background: #000;
-            border: 1px solid #333;
-            color: #5cb85c;
-            font-family: 'Courier New', monospace;
-            font-size: 1em;
-        }
-        
-        .command-input:focus {
-            outline: none;
-            border-color: #555;
-            background: #0d0d0d;
-        }
-        
-        .command-input::placeholder {
-            color: #333;
-        }
-        
-        .btn {
-            padding: 12px 24px;
-            border: 1px solid #333;
-            font-family: 'Courier New', monospace;
-            font-size: 0.9em;
-            cursor: pointer;
-            transition: all 0.2s;
-            margin-top: 15px;
-            background: #0d0d0d;
-        }
-        
-        .btn-primary {
-            border-color: #5cb85c;
-            color: #5cb85c;
-        }
-        
-        .btn-primary:hover {
-            background: #1a1a1a;
-        }
-        
-        .btn-primary:active {
-            background: #000;
-        }
-        
-        .diagnostics-panel {
-            grid-column: 1;
-            grid-row: 2;
-        }
-        
-        .diag-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 15px;
-        }
-        
-        .diag-item {
-            padding: 12px;
-            background: #1a1a1a;
-            border: 1px solid #333;
-        }
-        
-        .diag-label {
-            font-size: 0.75em;
-            color: #666;
-            margin-bottom: 5px;
-        }
-        
-        .diag-value {
-            font-size: 1.1em;
-            color: #5cb85c;
-            font-weight: bold;
-        }
-    </style>
-</head>
+<head><title>ShadowHound</title></head>
 <body>
-    <div class="container">
-        <!-- Header -->
-        <div class="header">
-            <div class="header-left">
-                <h1>shadowhound@mission-control:~$</h1>
-                <div class="subtitle">autonomous robot control interface</div>
-            </div>
-            <div class="header-right">
-                <span id="wsStatus" class="connection-status disconnected">[OFFLINE]</span>
-            </div>
-        </div>
-        
-        <!-- Main Grid -->
-        <div class="main-grid">
-            <!-- Camera Feed Panel -->
-            <div class="panel camera-panel">
-                <div class="panel-header">camera_feed:</div>
-                <div class="camera-feed" id="cameraFeed">
-                    <div class="camera-placeholder">[ no signal ]</div>
-                </div>
-                
-                <!-- Mock Image Upload -->
-                <div class="upload-panel">
-                    <label class="upload-label">mock_image (testing):</label>
-                    <div class="file-input-wrapper">
-                        <input type="file" id="imageUpload" accept="image/*" onchange="uploadMockImage(event)">
-                        <div class="file-input-button">[ upload test image ]</div>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- Mission Control Panel -->
-            <div class="panel mission-panel">
-                <div class="panel-header">mission_log:</div>
-                <div class="status-display" id="status">
-                    <div class="log-entry">system ready. awaiting commands.</div>
-                </div>
-                <input 
-                    type="text" 
-                    id="commandInput" 
-                    class="command-input" 
-                    placeholder="$ enter command..."
-                    onkeypress="if(event.key === 'Enter') sendCommand()"
-                >
-                <button class="btn btn-primary" onclick="sendCommand()">[ execute ]</button>
-            </div>
-            
-            <!-- Diagnostics Panel -->
-            <div class="panel diagnostics-panel">
-                <div class="panel-header">diagnostics:</div>
-                <div class="diag-grid">
-                    <div class="diag-item">
-                        <div class="diag-label">status:</div>
-                        <div class="diag-value" id="diagStatus">IDLE</div>
-                    </div>
-                    <div class="diag-item">
-                        <div class="diag-label">battery:</div>
-                        <div class="diag-value" id="diagBattery">--</div>
-                    </div>
-                    <div class="diag-item">
-                        <div class="diag-label">position:</div>
-                        <div class="diag-value" id="diagPosition">0.0, 0.0</div>
-                    </div>
-                    <div class="diag-item">
-                        <div class="diag-label">connection:</div>
-                        <div class="diag-value" id="diagConnection">STANDBY</div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-    
-    <script>
-        let ws;
-        const statusDiv = document.getElementById('status');
-        const wsStatusSpan = document.getElementById('wsStatus');
-        const commandInput = document.getElementById('commandInput');
-        const cameraFeed = document.getElementById('cameraFeed');
-        const diagStatus = document.getElementById('diagStatus');
-        const diagConnection = document.getElementById('diagConnection');
-        
-        // WebSocket connection
-        function connectWebSocket() {
-            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-            ws = new WebSocket(`${protocol}//${window.location.host}/ws/status`);
-            
-            ws.onopen = () => {
-                console.log('WebSocket connected');
-                wsStatusSpan.textContent = '[ONLINE]';
-                wsStatusSpan.className = 'connection-status connected';
-                diagConnection.textContent = 'ONLINE';
-                addLogEntry('websocket connected');
-            };
-            
-            ws.onmessage = (event) => {
-                console.log('Status update:', event.data);
-                addLogEntry(event.data.toLowerCase());
-                
-                // Update diagnostics
-                if (event.data.includes('EXECUTING')) {
-                    diagStatus.textContent = 'ACTIVE';
-                } else if (event.data.includes('COMPLETED')) {
-                    diagStatus.textContent = 'IDLE';
-                }
-            };
-            
-            ws.onclose = () => {
-                console.log('WebSocket disconnected');
-                wsStatusSpan.textContent = '[OFFLINE]';
-                wsStatusSpan.className = 'connection-status disconnected';
-                diagConnection.textContent = 'OFFLINE';
-                addLogEntry('websocket disconnected', 'error');
-                // Reconnect after 3 seconds
-                setTimeout(connectWebSocket, 3000);
-            };
-            
-            ws.onerror = (error) => {
-                console.error('WebSocket error:', error);
-                addLogEntry('websocket error', 'error');
-            };
-        }
-        
-        function addLogEntry(message, type = 'info') {
-            const entry = document.createElement('div');
-            entry.className = 'log-entry';
-            
-            const timestamp = new Date().toLocaleTimeString('en-US', { hour12: false });
-            const prefix = type === 'error' ? '[!]' : '[>]';
-            
-            entry.textContent = `${timestamp} ${prefix} ${message}`;
-            
-            if (type === 'error') {
-                entry.style.color = '#ff0000';
-            }
-            
-            statusDiv.appendChild(entry);
-            statusDiv.scrollTop = statusDiv.scrollHeight;
-            
-            // Keep only last 50 entries
-            while (statusDiv.children.length > 50) {
-                statusDiv.removeChild(statusDiv.firstChild);
-            }
-        }
-        
-        // Send command via REST API
-        async function sendCommand() {
-            const command = commandInput.value.trim();
-            if (!command) {
-                addLogEntry('no command entered', 'error');
-                return;
-            }
-            
-            addLogEntry(`executing: ${command}`);
-            diagStatus.textContent = 'ACTIVE';
-            commandInput.value = '';
-            
-            try {
-                const response = await fetch('/api/mission', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({command: command})
-                });
-                
-                const data = await response.json();
-                console.log('Response:', data);
-                
-                if (data.success) {
-                    addLogEntry(`completed: ${data.message}`);
-                    diagStatus.textContent = 'IDLE';
-                } else {
-                    addLogEntry(`failed: ${data.message}`, 'error');
-                    diagStatus.textContent = 'ERROR';
-                }
-            } catch (error) {
-                console.error('Error sending command:', error);
-                addLogEntry(`system error: ${error.message}`, 'error');
-                diagStatus.textContent = 'ERROR';
-            }
-        }
-        
-        // Mock image upload
-        async function uploadMockImage(event) {
-            const file = event.target.files[0];
-            if (!file) return;
-            
-            addLogEntry(`uploading: ${file.name}`);
-            
-            // Display image in camera feed
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                cameraFeed.innerHTML = `<img src="${e.target.result}" alt="Mock camera feed">`;
-                addLogEntry('mock image loaded');
-            };
-            reader.readAsDataURL(file);
-            
-            // Upload to backend
-            const formData = new FormData();
-            formData.append('image', file);
-            formData.append('camera', 'front');
-            
-            try {
-                const response = await fetch('/api/mock/image', {
-                    method: 'POST',
-                    body: formData
-                });
-                
-                const data = await response.json();
-                
-                if (data.success) {
-                    addLogEntry(`uploaded: ${data.filename}`);
-                } else {
-                    addLogEntry(`upload failed: ${data.message}`, 'error');
-                }
-            } catch (error) {
-                console.error('Error uploading image:', error);
-                addLogEntry(`upload error: ${error.message}`, 'error');
-            }
-        }
-        
-        // Initialize
-        connectWebSocket();
-        addLogEntry('system initialized');
-    </script>
+    <h1>ShadowHound Mission Control</h1>
+    <p>Template file not found. Please check dashboard_template.html</p>
 </body>
 </html>
-        """
+            """
 
-    async def broadcast(self, message: str):
+        async def broadcast(self, message: str):
         """Broadcast message to all connected WebSocket clients."""
         if not self.active_connections:
             return
@@ -768,6 +324,39 @@ class WebInterface:
     def has_mock_image(self, camera: str = "front") -> bool:
         """Check if mock image exists for specified camera."""
         return camera in self.mock_images
+
+
+    def update_camera_frame(self, image_data: bytes):
+        """Update the latest camera frame.
+        
+        Args:
+            image_data: JPEG or PNG image bytes
+        """
+        self.latest_camera_frame = image_data
+
+    def update_diagnostics(self, diagnostics: Dict[str, Any]):
+        """Update diagnostics information.
+        
+        Args:
+            diagnostics: Dict containing robot_mode, topics_available, action_servers, etc.
+        """
+        import datetime
+        self.diagnostics.update(diagnostics)
+        self.diagnostics["last_update"] = datetime.datetime.now().isoformat()
+
+    def add_terminal_line(self, line: str):
+        """Add a line to the terminal buffer.
+        
+        Args:
+            line: Text line to add
+        """
+        import datetime
+        timestamp = datetime.datetime.now().strftime("%H:%M:%S")
+        self.terminal_buffer.append(f"[{timestamp}] {line}")
+        
+        # Keep buffer at max size
+        if len(self.terminal_buffer) > self.max_terminal_lines:
+            self.terminal_buffer = self.terminal_buffer[-self.max_terminal_lines:]
 
     def start(self):
         """Start web server in background thread."""

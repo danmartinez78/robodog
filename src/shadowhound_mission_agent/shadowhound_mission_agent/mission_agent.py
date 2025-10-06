@@ -13,6 +13,7 @@ The actual mission execution logic is in MissionExecutor (pure Python).
 import rclpy
 from rclpy.node import Node
 from std_msgs.msg import String
+from sensor_msgs.msg import CompressedImage
 import os
 from typing import Optional, Dict, Any
 from .web_interface import WebInterface
