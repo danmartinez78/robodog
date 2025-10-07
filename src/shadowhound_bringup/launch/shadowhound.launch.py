@@ -25,8 +25,8 @@ def generate_launch_description():
 
     use_planning_arg = DeclareLaunchArgument(
         "use_planning_agent",
-        default_value="false",
-        description="Use planning agent for multi-step missions",
+        default_value="true",  # Changed to true for multi-step sequential execution
+        description="Use planning agent for multi-step missions (recommended)",
     )
 
     # Include mission agent launch
