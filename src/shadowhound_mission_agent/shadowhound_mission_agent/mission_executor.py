@@ -211,14 +211,15 @@ class MissionExecutor:
                 f"max_output={self.config.max_output_tokens})"
             )
 
-    def execute_mission(self, command: str) -> str:
+    def execute_mission(self, command: str) -> tuple[str, dict]:
         """Execute a mission command.
 
         Args:
             command: Natural language mission command
 
         Returns:
-            Agent's response as a string
+            Tuple of (response string, timing dict)
+            Timing dict contains: agent_duration, total_duration, overhead_duration
 
         Raises:
             RuntimeError: If executor not initialized or execution fails
@@ -242,12 +243,21 @@ class MissionExecutor:
             
             agent_duration = time.time() - agent_start
             total_duration = time.time() - start_time
+            overhead_duration = total_duration - agent_duration
+            
+            timing_info = {
+                "agent_duration": agent_duration,
+                "total_duration": total_duration,
+                "overhead_duration": overhead_duration,
+                "agent_percentage": (agent_duration / total_duration * 100) if total_duration > 0 else 0
+            }
             
             self.logger.info(f"⏱️  Timing breakdown:")
-            self.logger.info(f"   Agent call: {agent_duration:.2f}s")
+            self.logger.info(f"   Agent call: {agent_duration:.2f}s ({timing_info['agent_percentage']:.0f}%)")
+            self.logger.info(f"   Overhead:   {overhead_duration:.3f}s")
             self.logger.info(f"   Total:      {total_duration:.2f}s")
             self.logger.info(f"Mission completed: {response[:100]}...")
-            return response
+            return response, timing_info
 
         except Exception as e:
             self.logger.error(f"Mission execution failed: {e}")

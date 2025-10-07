@@ -92,29 +92,10 @@ class MissionAgentNode(Node):
             String, "mission_command", self.mission_callback, 10
         )
 
-        # Subscribe to camera feed if web interface is enabled
-        self.camera_sub = None
-        if enable_web:
-            try:
-                from sensor_msgs.msg import Image
-                from rclpy.qos import QoSProfile, QoSReliabilityPolicy, QoSHistoryPolicy
-                
-                # Use BEST_EFFORT QoS to match camera publisher
-                qos_profile = QoSProfile(
-                    reliability=QoSReliabilityPolicy.BEST_EFFORT,
-                    history=QoSHistoryPolicy.KEEP_LAST,
-                    depth=1
-                )
-                
-                self.camera_sub = self.create_subscription(
-                    Image,
-                    "/camera/image_raw",
-                    self._camera_callback,
-                    qos_profile
-                )
-                self.get_logger().info("📷 Subscribed to camera feed: /camera/image_raw")
-            except Exception as e:
-                self.get_logger().warn(f"Failed to subscribe to camera: {e}")
+        # Subscribe to camera feed for web UI
+        self.camera_sub = self.create_subscription(
+            CompressedImage, "/camera/compressed", self.camera_callback, 10
+        )
 
         # Create ROS publishers
         self.status_pub = self.create_publisher(String, "mission_status", 10)
@@ -217,21 +198,34 @@ class MissionAgentNode(Node):
             self.web = None
 
     def _execute_mission_from_web(self, command: str) -> Dict[str, Any]:
-        """Execute mission from web interface.
+        """Execute mission command from web interface.
 
-        This is called by the web interface when a command is submitted.
-        Returns a dict with 'success' and 'message' keys.
+        Args:
+            command: Mission command string
+
+        Returns:
+            Dict with success status and message
         """
-        self.get_logger().info(f"🌐 Web command: {command}")
-
         try:
-            # Delegate to MissionExecutor
-            response = self.mission_executor.execute_mission(command)
+            # Delegate to MissionExecutor (now returns timing info too)
+            response, timing_info = self.mission_executor.execute_mission(command)
 
-            # Broadcast the response to all web clients
+            # Broadcast the response and timing to all web clients
             if self.web:
                 response_preview = response[:200] if len(response) > 200 else response
                 self.web.broadcast_sync(f"✅ {response_preview}")
+                
+                # Broadcast timing info
+                timing_msg = (
+                    f"⏱️  TIMING: Agent {timing_info['agent_duration']:.2f}s "
+                    f"| Overhead {timing_info['overhead_duration']:.3f}s "
+                    f"| Total {timing_info['total_duration']:.2f}s"
+                )
+                self.web.broadcast_sync(timing_msg)
+                self.web.add_terminal_line(timing_msg)
+                
+                # Update performance metrics in web interface
+                self.web.update_performance_metrics(timing_info)
 
             return {"success": True, "message": response}
 
@@ -256,8 +250,8 @@ class MissionAgentNode(Node):
         self.status_pub.publish(status)
 
         try:
-            # Delegate to MissionExecutor
-            response = self.mission_executor.execute_mission(command)
+            # Delegate to MissionExecutor (now returns timing info too)
+            response, timing_info = self.mission_executor.execute_mission(command)
 
             # Publish result
             status.data = f"COMPLETED: {command} | Result: {response[:100]}"
@@ -268,6 +262,18 @@ class MissionAgentNode(Node):
             if self.web:
                 response_preview = response[:200] if len(response) > 200 else response
                 self.web.broadcast_sync(f"✅ {response_preview}")
+                
+                # Broadcast timing info
+                timing_msg = (
+                    f"⏱️  TIMING: Agent {timing_info['agent_duration']:.2f}s "
+                    f"| Overhead {timing_info['overhead_duration']:.3f}s "
+                    f"| Total {timing_info['total_duration']:.2f}s"
+                )
+                self.web.broadcast_sync(timing_msg)
+                self.web.add_terminal_line(timing_msg)
+                
+                # Update performance metrics
+                self.web.update_performance_metrics(timing_info)
 
         except Exception as e:
             self.get_logger().error(f"❌ Mission failed: {e}")
@@ -279,50 +285,12 @@ class MissionAgentNode(Node):
                 self.web.broadcast_sync(f"❌ FAILED: {command} - {str(e)}")
                 self.web.add_terminal_line(f"❌ FAILED: {command} - {str(e)}")
 
-    def _camera_callback(self, msg):
-        """Handle incoming camera images and forward to web interface."""
-        if not self.web:
-            return
-        
-        try:
-            import base64
-            import cv2
-            import numpy as np
-            
-            # Convert ROS Image message to numpy array
-            # Assuming RGB8 or BGR8 encoding (common for cameras)
-            if msg.encoding == 'rgb8':
-                image_np = np.frombuffer(msg.data, dtype=np.uint8).reshape(msg.height, msg.width, 3)
-            elif msg.encoding == 'bgr8':
-                image_np = np.frombuffer(msg.data, dtype=np.uint8).reshape(msg.height, msg.width, 3)
-                image_np = cv2.cvtColor(image_np, cv2.COLOR_BGR2RGB)
-            else:
-                # Unsupported encoding - skip
-                if not hasattr(self, '_encoding_warned'):
-                    self.get_logger().warn(f"Unsupported image encoding: {msg.encoding}")
-                    self._encoding_warned = True
-                return
-            
-            # Encode to JPEG
-            success, buffer = cv2.imencode('.jpg', cv2.cvtColor(image_np, cv2.COLOR_RGB2BGR), 
-                                           [cv2.IMWRITE_JPEG_QUALITY, 80])
-            if not success:
-                return
-            
-            # Convert to base64
-            image_base64 = base64.b64encode(buffer.tobytes()).decode('utf-8')
-            
-            # Send to web interface via WebSocket
-            # Format: CAMERA_FRAME:<base64_data>
-            self.web.broadcast_sync(f"CAMERA_FRAME:{image_base64}")
-            
-        except Exception as e:
-            # Only log errors occasionally to avoid spam
-            if not hasattr(self, '_camera_error_count'):
-                self._camera_error_count = 0
-            self._camera_error_count += 1
-            if self._camera_error_count % 100 == 0:
-                self.get_logger().warn(f"Camera callback error (x{self._camera_error_count}): {e}")
+
+    def camera_callback(self, msg: CompressedImage):
+        """Handle camera feed for web UI."""
+        if self.web:
+            # Forward compressed image data to web interface
+            self.web.update_camera_frame(bytes(msg.data))
     
     def update_diagnostics(self):
         """Update diagnostics information for web UI."""
@@ -355,8 +323,6 @@ class MissionAgentNode(Node):
             
         except Exception as e:
             self.get_logger().debug(f"Diagnostics update error: {e}")
-            if self._camera_error_count % 100 == 0:
-                self.get_logger().warn(f"Camera callback error (x{self._camera_error_count}): {e}")
 
     def destroy_node(self):
         """Clean up resources."""

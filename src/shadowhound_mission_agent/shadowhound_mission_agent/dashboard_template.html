@@ -2,7 +2,7 @@
 <html>
 
 <head>
-    <title>ShadowHound Mission Control</title>
+    <title>🐕 ShadowHound Mission Control</title>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <style>
@@ -150,7 +150,7 @@
         .terminal {
             background: #000;
             border: 1px solid #333;
-            border-radius: 3px 3px 0 0; /* Rounded top only */
+            border-radius: 3px;
             padding: 15px;
             height: 400px;
             overflow-y: auto;
@@ -183,35 +183,6 @@
 
         .terminal-prompt {
             color: #888;
-        }
-
-        .terminal-panel {
-            grid-column: 1 / -1; /* Full width */
-        }
-
-        .terminal-input-container {
-            display: flex;
-            align-items: center;
-            background: #000;
-            border: 1px solid #333;
-            border-top: none;
-            border-radius: 0 0 3px 3px;
-            padding: 10px 15px;
-            gap: 10px;
-        }
-
-        .terminal-input {
-            flex: 1;
-            background: transparent;
-            border: none;
-            color: #5cb85c;
-            font-family: 'Courier New', monospace;
-            font-size: 1em;
-            outline: none;
-        }
-
-        .terminal-input::placeholder {
-            color: #555;
         }
 
         .status-box {
@@ -280,6 +251,13 @@
             color: #5cb85c;
         }
 
+        .quick-commands {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 10px;
+            margin-top: 20px;
+        }
+
         h3 {
             color: #888;
             margin: 20px 0 10px 0;
@@ -312,7 +290,7 @@
 <body>
     <div class="container">
         <div class="header">
-            <h1>SHADOWHOUND</h1>
+            <h1>🐕 SHADOWHOUND</h1>
             <p>AUTONOMOUS ROBOT MISSION CONTROL</p>
             <span id="wsStatus" class="connection-status disconnected">CONNECTING...</span>
         </div>
@@ -320,15 +298,51 @@
         <div class="grid">
             <!-- Camera Feed -->
             <div class="panel">
-                <h2>CAMERA FEED</h2>
+                <h2>📹 CAMERA FEED</h2>
                 <div class="video-feed" id="cameraFeed">
                     <span>NO FEED AVAILABLE</span>
                 </div>
             </div>
 
+            <!-- Performance Metrics -->
+            <div class="panel">
+                <h2>⚡ PERFORMANCE METRICS</h2>
+                <div class="diagnostics-grid">
+                    <div class="diag-item">
+                        <div class="diag-label">AGENT CALL</div>
+                        <div class="diag-value" id="agentDuration">--</div>
+                    </div>
+                    <div class="diag-item">
+                        <div class="diag-label">OVERHEAD</div>
+                        <div class="diag-value" id="overheadDuration">--</div>
+                    </div>
+                    <div class="diag-item">
+                        <div class="diag-label">TOTAL TIME</div>
+                        <div class="diag-value" id="totalDuration">--</div>
+                    </div>
+                    <div class="diag-item">
+                        <div class="diag-label">COMMANDS</div>
+                        <div class="diag-value" id="commandCount">0</div>
+                    </div>
+                </div>
+                <h3>Averages (Last 50 Commands)</h3>
+                <div class="diagnostics-grid">
+                    <div class="diag-item">
+                        <div class="diag-label">AVG AGENT</div>
+                        <div class="diag-value" id="avgAgentDuration">--</div>
+                    </div>
+                    <div class="diag-item">
+                        <div class="diag-label">AVG TOTAL</div>
+                        <div class="diag-value" id="avgTotalDuration">--</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="grid">
             <!-- Diagnostics -->
             <div class="panel">
-                <h2>DIAGNOSTICS</h2>
+                <h2>📊 DIAGNOSTICS</h2>
                 <div class="diagnostics-grid">
                     <div class="diag-item">
                         <div class="diag-label">ROBOT MODE</div>
@@ -355,27 +369,49 @@
         </div>
 
         <div class="grid">
-            <!-- Terminal with integrated command input -->
-            <div class="panel terminal-panel">
-                <h2>MISSION TERMINAL</h2>
+            <!-- Terminal -->
+            <div class="panel">
+                <h2>💻 TERMINAL</h2>
                 <div class="terminal" id="terminal">
                     <div class="terminal-line">
                         <span class="terminal-prompt">shadowhound@mission-control:~$</span> Waiting for output...
                     </div>
                 </div>
-                <div class="terminal-input-container">
-                    <span class="terminal-prompt">shadowhound@mission-control:~$</span>
-                    <input type="text" id="commandInput" class="terminal-input"
-                        placeholder="Enter mission command..."
-                        onkeypress="if(event.key === 'Enter') sendCommand()"
-                        autocomplete="off">
+            </div>
+
+            <!-- Mission Status -->
+            <div class="panel">
+                <h2>📡 MISSION STATUS</h2>
+                <div class="status-box">
+                    <div id="status">Waiting for commands...</div>
                 </div>
+            </div>
+        </div>
+
+        <!-- Command Center -->
+        <div class="panel">
+            <h2>🎮 COMMAND CENTER</h2>
+            <h3>Custom Command</h3>
+            <input type="text" id="commandInput" class="command-input"
+                placeholder="Enter mission command (e.g., 'stand up and wave hello')"
+                onkeypress="if(event.key === 'Enter') sendCommand()">
+            <button class="btn btn-primary" onclick="sendCommand()">▶️ EXECUTE</button>
+
+            <h3>Quick Commands</h3>
+            <div class="quick-commands">
+                <button class="btn btn-secondary" onclick="sendQuick('stand up')">🧍 STAND</button>
+                <button class="btn btn-secondary" onclick="sendQuick('sit down')">🪑 SIT</button>
+                <button class="btn btn-secondary" onclick="sendQuick('wave hello')">👋 WAVE</button>
+                <button class="btn btn-secondary" onclick="sendQuick('perform dance 1')">💃 DANCE</button>
+                <button class="btn btn-secondary" onclick="sendQuick('stretch')">🤸 STRETCH</button>
+                <button class="btn btn-secondary" onclick="sendQuick('balance stand')">⚖️ BALANCE</button>
             </div>
         </div>
     </div>
 
     <script>
         let ws;
+        const statusDiv = document.getElementById('status');
         const wsStatusSpan = document.getElementById('wsStatus');
         const commandInput = document.getElementById('commandInput');
         const cameraFeed = document.getElementById('cameraFeed');
@@ -385,58 +421,42 @@
         const actionCount = document.getElementById('actionCount');
         const lastUpdate = document.getElementById('lastUpdate');
         const topicList = document.getElementById('topicList');
+        
+        // Performance metrics elements
+        const agentDuration = document.getElementById('agentDuration');
+        const overheadDuration = document.getElementById('overheadDuration');
+        const totalDuration = document.getElementById('totalDuration');
+        const commandCount = document.getElementById('commandCount');
+        const avgAgentDuration = document.getElementById('avgAgentDuration');
+        const avgTotalDuration = document.getElementById('avgTotalDuration');
 
         // WebSocket connection
         function connectWebSocket() {
-            try {
-                const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-                const wsUrl = `${protocol}//${window.location.host}/ws/status`;
-                console.log('Attempting WebSocket connection to:', wsUrl);
-                
-                ws = new WebSocket(wsUrl);
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            ws = new WebSocket(`${protocol}//${window.location.host}/ws/status`);
 
-                ws.onopen = () => {
-                    console.log('✅ WebSocket connected');
-                    wsStatusSpan.textContent = 'CONNECTED';
-                    wsStatusSpan.className = 'connection-status connected';
-                    
-                    // Send initial ping
-                    ws.send('ping');
-                };
+            ws.onopen = () => {
+                console.log('WebSocket connected');
+                wsStatusSpan.textContent = 'CONNECTED';
+                wsStatusSpan.className = 'connection-status connected';
+            };
 
-                ws.onmessage = (event) => {
-                    console.log('WebSocket message:', event.data);
-                    
-                    // Check if this is a camera frame
-                    if (event.data.startsWith('CAMERA_FRAME:')) {
-                        const base64Data = event.data.substring(13); // Remove 'CAMERA_FRAME:' prefix
-                        const imgSrc = 'data:image/jpeg;base64,' + base64Data;
-                        cameraFeed.innerHTML = `<img src="${imgSrc}" alt="Robot camera feed">`;
-                        return; // Don't log camera frames
-                    }
-                    
-                    // Regular status message - show in terminal only
-                    addTerminalLine(event.data);
-                };
+            ws.onmessage = (event) => {
+                console.log('Status update:', event.data);
+                addTerminalLine(event.data);
+                statusDiv.textContent = event.data;
+            };
 
-                ws.onclose = () => {
-                    console.log('❌ WebSocket disconnected, reconnecting in 3s...');
-                    wsStatusSpan.textContent = 'DISCONNECTED';
-                    wsStatusSpan.className = 'connection-status disconnected';
-                    setTimeout(connectWebSocket, 3000);
-                };
-
-                ws.onerror = (error) => {
-                    console.error('❌ WebSocket error:', error);
-                    wsStatusSpan.textContent = 'ERROR';
-                    wsStatusSpan.className = 'connection-status disconnected';
-                };
-            } catch (error) {
-                console.error('❌ Failed to create WebSocket:', error);
-                wsStatusSpan.textContent = 'ERROR';
+            ws.onclose = () => {
+                console.log('WebSocket disconnected');
+                wsStatusSpan.textContent = 'DISCONNECTED';
                 wsStatusSpan.className = 'connection-status disconnected';
                 setTimeout(connectWebSocket, 3000);
-            }
+            };
+
+            ws.onerror = (error) => {
+                console.error('WebSocket error:', error);
+            };
         }
 
         // Update camera feed
@@ -501,6 +521,49 @@
                 console.error('Terminal update error:', error);
             }
         }
+        
+        // Update performance metrics
+        async function updatePerformance() {
+            try {
+                const response = await fetch('/api/performance');
+                const data = await response.json();
+                
+                if (data.latest) {
+                    const latest = data.latest;
+                    
+                    // Update latest timing values
+                    agentDuration.textContent = `${latest.agent_duration.toFixed(2)}s`;
+                    overheadDuration.textContent = `${latest.overhead_duration.toFixed(3)}s`;
+                    totalDuration.textContent = `${latest.total_duration.toFixed(2)}s`;
+                    commandCount.textContent = latest.command_count;
+                    
+                    // Update averages
+                    avgAgentDuration.textContent = `${latest.avg_agent_duration.toFixed(2)}s`;
+                    avgTotalDuration.textContent = `${latest.avg_total_duration.toFixed(2)}s`;
+                    
+                    // Color code based on performance
+                    // Agent call: <2s = good, 2-4s = warning, >4s = error
+                    if (latest.agent_duration < 2.0) {
+                        agentDuration.className = 'diag-value';
+                    } else if (latest.agent_duration < 4.0) {
+                        agentDuration.className = 'diag-value warning';
+                    } else {
+                        agentDuration.className = 'diag-value error';
+                    }
+                    
+                    // Total: <3s = good, 3-5s = warning, >5s = error
+                    if (latest.total_duration < 3.0) {
+                        totalDuration.className = 'diag-value';
+                    } else if (latest.total_duration < 5.0) {
+                        totalDuration.className = 'diag-value warning';
+                    } else {
+                        totalDuration.className = 'diag-value error';
+                    }
+                }
+            } catch (error) {
+                console.error('Performance update error:', error);
+            }
+        }
 
         function addTerminalLine(text) {
             const timestamp = new Date().toLocaleTimeString();
@@ -530,6 +593,7 @@
         }
 
         async function sendQuick(command) {
+            statusDiv.textContent = `⏳ Sending: ${command}`;
             addTerminalLine(`> ${command}`);
 
             try {
@@ -542,12 +606,16 @@
                 const data = await response.json();
                 console.log('Response:', data);
 
-                // Don't add success/error here - the mission agent broadcasts
-                // results via WebSocket, so we'd get duplicate messages
-                // The response is already shown via WebSocket broadcast
-
+                if (data.success) {
+                    statusDiv.textContent = `✅ ${data.message}`;
+                    addTerminalLine(`✅ SUCCESS: ${data.message}`);
+                } else {
+                    statusDiv.textContent = `❌ ${data.message}`;
+                    addTerminalLine(`❌ ERROR: ${data.message}`);
+                }
             } catch (error) {
                 console.error('Error sending command:', error);
+                statusDiv.textContent = `❌ Error: ${error.message}`;
                 addTerminalLine(`❌ EXCEPTION: ${error.message}`);
             }
         }
@@ -556,15 +624,16 @@
         connectWebSocket();
 
         // Poll for updates
-        // Camera now uses WebSocket streaming instead of polling
-        // setInterval(updateCamera, 1000);        // 1 FPS camera (DISABLED - using WebSocket)
+        setInterval(updateCamera, 1000);        // 1 FPS camera
         setInterval(updateDiagnostics, 2000);   // 0.5 Hz diagnostics
         setInterval(updateTerminal, 1000);      // 1 Hz terminal
+        setInterval(updatePerformance, 1000);   // 1 Hz performance metrics
 
         // Initial updates
-        // updateCamera();  // DISABLED - camera streams via WebSocket
+        updateCamera();
         updateDiagnostics();
         updateTerminal();
+        updatePerformance();
     </script>
 </body>
 
