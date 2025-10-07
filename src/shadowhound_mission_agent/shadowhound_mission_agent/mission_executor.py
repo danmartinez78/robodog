@@ -223,19 +223,29 @@ class MissionExecutor:
         Raises:
             RuntimeError: If executor not initialized or execution fails
         """
+        import time
+        
         if not self._initialized:
             raise RuntimeError("MissionExecutor not initialized. Call initialize() first.")
 
         self.logger.info(f"Executing mission: {command}")
+        start_time = time.time()
 
         try:
             # Execute through DIMOS agent
+            agent_start = time.time()
             if self.config.use_planning_agent:
                 response = self.agent.plan_and_execute(command)
             else:
                 # OpenAIAgent uses run_observable_query() which returns an Observable
                 response = self.agent.run_observable_query(command).run()
-
+            
+            agent_duration = time.time() - agent_start
+            total_duration = time.time() - start_time
+            
+            self.logger.info(f"⏱️  Timing breakdown:")
+            self.logger.info(f"   Agent call: {agent_duration:.2f}s")
+            self.logger.info(f"   Total:      {total_duration:.2f}s")
             self.logger.info(f"Mission completed: {response[:100]}...")
             return response
 
