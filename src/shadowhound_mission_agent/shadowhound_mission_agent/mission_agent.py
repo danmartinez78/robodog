@@ -2,7 +2,7 @@
 """ShadowHound Mission Agent - ROS2 wrapper for mission execution.
 
 This node provides a ROS2 interface to the MissionExecutor, handling:
-- ROS node lifecycle and parameter management  
+- ROS node lifecycle and parameter management
 - Topic subscriptions (mission commands) and publications (status)
 - Web interface integration
 - ROS logging bridge
@@ -22,7 +22,7 @@ from .mission_executor import MissionExecutor, MissionExecutorConfig
 
 class MissionAgentNode(Node):
     """ROS2 node providing interface to MissionExecutor.
-    
+
     This is a thin wrapper that handles ROS-specific concerns while
     delegating all business logic to MissionExecutor.
     """
@@ -214,7 +214,7 @@ class MissionAgentNode(Node):
             if self.web:
                 response_preview = response[:200] if len(response) > 200 else response
                 self.web.broadcast_sync(f"✅ {response_preview}")
-                
+
                 # Broadcast timing info
                 timing_msg = (
                     f"⏱️  TIMING: Agent {timing_info['agent_duration']:.2f}s "
@@ -223,7 +223,7 @@ class MissionAgentNode(Node):
                 )
                 self.web.broadcast_sync(timing_msg)
                 self.web.add_terminal_line(timing_msg)
-                
+
                 # Update performance metrics in web interface
                 self.web.update_performance_metrics(timing_info)
 
@@ -262,7 +262,7 @@ class MissionAgentNode(Node):
             if self.web:
                 response_preview = response[:200] if len(response) > 200 else response
                 self.web.broadcast_sync(f"✅ {response_preview}")
-                
+
                 # Broadcast timing info
                 timing_msg = (
                     f"⏱️  TIMING: Agent {timing_info['agent_duration']:.2f}s "
@@ -271,7 +271,7 @@ class MissionAgentNode(Node):
                 )
                 self.web.broadcast_sync(timing_msg)
                 self.web.add_terminal_line(timing_msg)
-                
+
                 # Update performance metrics
                 self.web.update_performance_metrics(timing_info)
 
@@ -285,42 +285,53 @@ class MissionAgentNode(Node):
                 self.web.broadcast_sync(f"❌ FAILED: {command} - {str(e)}")
                 self.web.add_terminal_line(f"❌ FAILED: {command} - {str(e)}")
 
-
     def camera_callback(self, msg: CompressedImage):
         """Handle camera feed for web UI."""
         if self.web:
             # Forward compressed image data to web interface
             self.web.update_camera_frame(bytes(msg.data))
-    
+
     def update_diagnostics(self):
         """Update diagnostics information for web UI."""
         if not self.web:
             return
-        
+
         try:
             # Get available topics
             topic_names_and_types = self.get_topic_names_and_types()
             robot_topics = [
-                name for name, types in topic_names_and_types
-                if any(keyword in name for keyword in [
-                    "go2", "camera", "imu", "odom", "costmap", "cmd_vel", "webrtc"
-                ])
+                name
+                for name, types in topic_names_and_types
+                if any(
+                    keyword in name
+                    for keyword in [
+                        "go2",
+                        "camera",
+                        "imu",
+                        "odom",
+                        "costmap",
+                        "cmd_vel",
+                        "webrtc",
+                    ]
+                )
             ]
-            
+
             # Get action servers (simplified - just check if nav2 actions exist)
             action_servers = []
             if any("/navigate_to_pose" in name for name, _ in topic_names_and_types):
                 action_servers.append("navigate_to_pose")
             if any("/spin" in name for name, _ in topic_names_and_types):
                 action_servers.append("spin")
-            
+
             # Update web interface
-            self.web.update_diagnostics({
-                "robot_mode": "operational",  # TODO: Get actual mode from robot state
-                "topics_available": robot_topics,
-                "action_servers": action_servers
-            })
-            
+            self.web.update_diagnostics(
+                {
+                    "robot_mode": "operational",  # TODO: Get actual mode from robot state
+                    "topics_available": robot_topics,
+                    "action_servers": action_servers,
+                }
+            )
+
         except Exception as e:
             self.get_logger().debug(f"Diagnostics update error: {e}")
 
@@ -357,6 +368,7 @@ def main(args=None):
     except Exception as e:
         print(f"Fatal error: {e}")
         import traceback
+
         traceback.print_exc()
     finally:
         if rclpy.ok():

@@ -225,9 +225,11 @@ class MissionExecutor:
             RuntimeError: If executor not initialized or execution fails
         """
         import time
-        
+
         if not self._initialized:
-            raise RuntimeError("MissionExecutor not initialized. Call initialize() first.")
+            raise RuntimeError(
+                "MissionExecutor not initialized. Call initialize() first."
+            )
 
         self.logger.info(f"Executing mission: {command}")
         start_time = time.time()
@@ -240,20 +242,24 @@ class MissionExecutor:
             else:
                 # OpenAIAgent uses run_observable_query() which returns an Observable
                 response = self.agent.run_observable_query(command).run()
-            
+
             agent_duration = time.time() - agent_start
             total_duration = time.time() - start_time
             overhead_duration = total_duration - agent_duration
-            
+
             timing_info = {
                 "agent_duration": agent_duration,
                 "total_duration": total_duration,
                 "overhead_duration": overhead_duration,
-                "agent_percentage": (agent_duration / total_duration * 100) if total_duration > 0 else 0
+                "agent_percentage": (
+                    (agent_duration / total_duration * 100) if total_duration > 0 else 0
+                ),
             }
-            
+
             self.logger.info(f"⏱️  Timing breakdown:")
-            self.logger.info(f"   Agent call: {agent_duration:.2f}s ({timing_info['agent_percentage']:.0f}%)")
+            self.logger.info(
+                f"   Agent call: {agent_duration:.2f}s ({timing_info['agent_percentage']:.0f}%)"
+            )
             self.logger.info(f"   Overhead:   {overhead_duration:.3f}s")
             self.logger.info(f"   Total:      {total_duration:.2f}s")
             self.logger.info(f"Mission completed: {response[:100]}...")

@@ -421,7 +421,7 @@
         const actionCount = document.getElementById('actionCount');
         const lastUpdate = document.getElementById('lastUpdate');
         const topicList = document.getElementById('topicList');
-        
+
         // Performance metrics elements
         const agentDuration = document.getElementById('agentDuration');
         const overheadDuration = document.getElementById('overheadDuration');
@@ -521,26 +521,26 @@
                 console.error('Terminal update error:', error);
             }
         }
-        
+
         // Update performance metrics
         async function updatePerformance() {
             try {
                 const response = await fetch('/api/performance');
                 const data = await response.json();
-                
+
                 if (data.latest) {
                     const latest = data.latest;
-                    
+
                     // Update latest timing values
                     agentDuration.textContent = `${latest.agent_duration.toFixed(2)}s`;
                     overheadDuration.textContent = `${latest.overhead_duration.toFixed(3)}s`;
                     totalDuration.textContent = `${latest.total_duration.toFixed(2)}s`;
                     commandCount.textContent = latest.command_count;
-                    
+
                     // Update averages
                     avgAgentDuration.textContent = `${latest.avg_agent_duration.toFixed(2)}s`;
                     avgTotalDuration.textContent = `${latest.avg_total_duration.toFixed(2)}s`;
-                    
+
                     // Color code based on performance
                     // Agent call: <2s = good, 2-4s = warning, >4s = error
                     if (latest.agent_duration < 2.0) {
@@ -550,7 +550,7 @@
                     } else {
                         agentDuration.className = 'diag-value error';
                     }
-                    
+
                     // Total: <3s = good, 3-5s = warning, >5s = error
                     if (latest.total_duration < 3.0) {
                         totalDuration.className = 'diag-value';
