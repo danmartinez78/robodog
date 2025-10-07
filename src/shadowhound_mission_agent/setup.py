@@ -16,6 +16,10 @@ setup(
             glob(os.path.join("launch", "*.launch.py")),
         ),
     ],
+    package_data={
+        package_name: ["dashboard_template.html"],
+    },
+    include_package_data=True,
     install_requires=[
         "setuptools",
         "fastapi>=0.104.0",

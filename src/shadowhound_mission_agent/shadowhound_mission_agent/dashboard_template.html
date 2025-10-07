@@ -2,7 +2,7 @@
 <html>
 
 <head>
-    <title>🐕 ShadowHound Mission Control</title>
+    <title>ShadowHound Mission Control</title>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <style>
@@ -251,13 +251,6 @@
             color: #5cb85c;
         }
 
-        .quick-commands {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-            gap: 10px;
-            margin-top: 20px;
-        }
-
         h3 {
             color: #888;
             margin: 20px 0 10px 0;
@@ -290,7 +283,7 @@
 <body>
     <div class="container">
         <div class="header">
-            <h1>🐕 SHADOWHOUND</h1>
+            <h1>SHADOWHOUND</h1>
             <p>AUTONOMOUS ROBOT MISSION CONTROL</p>
             <span id="wsStatus" class="connection-status disconnected">CONNECTING...</span>
         </div>
@@ -298,7 +291,7 @@
         <div class="grid">
             <!-- Camera Feed -->
             <div class="panel">
-                <h2>📹 CAMERA FEED</h2>
+                <h2>CAMERA FEED</h2>
                 <div class="video-feed" id="cameraFeed">
                     <span>NO FEED AVAILABLE</span>
                 </div>
@@ -306,7 +299,7 @@
 
             <!-- Diagnostics -->
             <div class="panel">
-                <h2>📊 DIAGNOSTICS</h2>
+                <h2>DIAGNOSTICS</h2>
                 <div class="diagnostics-grid">
                     <div class="diag-item">
                         <div class="diag-label">ROBOT MODE</div>
@@ -335,7 +328,7 @@
         <div class="grid">
             <!-- Terminal -->
             <div class="panel">
-                <h2>💻 TERMINAL</h2>
+                <h2>TERMINAL</h2>
                 <div class="terminal" id="terminal">
                     <div class="terminal-line">
                         <span class="terminal-prompt">shadowhound@mission-control:~$</span> Waiting for output...
@@ -345,7 +338,7 @@
 
             <!-- Mission Status -->
             <div class="panel">
-                <h2>📡 MISSION STATUS</h2>
+                <h2>MISSION STATUS</h2>
                 <div class="status-box">
                     <div id="status">Waiting for commands...</div>
                 </div>
@@ -354,22 +347,12 @@
 
         <!-- Command Center -->
         <div class="panel">
-            <h2>🎮 COMMAND CENTER</h2>
-            <h3>Custom Command</h3>
+            <h2>COMMAND CENTER</h2>
+            <h3>Natural Language Command</h3>
             <input type="text" id="commandInput" class="command-input"
-                placeholder="Enter mission command (e.g., 'stand up and wave hello')"
+                placeholder="Enter mission command (e.g., 'Patrol the perimeter and report any anomalies')"
                 onkeypress="if(event.key === 'Enter') sendCommand()">
-            <button class="btn btn-primary" onclick="sendCommand()">▶️ EXECUTE</button>
-
-            <h3>Quick Commands</h3>
-            <div class="quick-commands">
-                <button class="btn btn-secondary" onclick="sendQuick('stand up')">🧍 STAND</button>
-                <button class="btn btn-secondary" onclick="sendQuick('sit down')">🪑 SIT</button>
-                <button class="btn btn-secondary" onclick="sendQuick('wave hello')">👋 WAVE</button>
-                <button class="btn btn-secondary" onclick="sendQuick('perform dance 1')">💃 DANCE</button>
-                <button class="btn btn-secondary" onclick="sendQuick('stretch')">🤸 STRETCH</button>
-                <button class="btn btn-secondary" onclick="sendQuick('balance stand')">⚖️ BALANCE</button>
-            </div>
+            <button class="btn btn-primary" onclick="sendCommand()">EXECUTE</button>
         </div>
     </div>
 
