@@ -399,6 +399,16 @@
 
             ws.onmessage = (event) => {
                 console.log('Status update:', event.data);
+                
+                // Check if this is a camera frame
+                if (event.data.startsWith('CAMERA_FRAME:')) {
+                    const base64Data = event.data.substring(13); // Remove 'CAMERA_FRAME:' prefix
+                    const imgSrc = 'data:image/jpeg;base64,' + base64Data;
+                    cameraFeed.innerHTML = `<img src="${imgSrc}" alt="Robot camera feed">`;
+                    return; // Don't log camera frames
+                }
+                
+                // Regular status message
                 addTerminalLine(event.data);
                 statusDiv.textContent = event.data;
             };
@@ -537,12 +547,13 @@
         connectWebSocket();
 
         // Poll for updates
-        setInterval(updateCamera, 1000);        // 1 FPS camera
+        // Camera now uses WebSocket streaming instead of polling
+        // setInterval(updateCamera, 1000);        // 1 FPS camera (DISABLED - using WebSocket)
         setInterval(updateDiagnostics, 2000);   // 0.5 Hz diagnostics
         setInterval(updateTerminal, 1000);      // 1 Hz terminal
 
         // Initial updates
-        updateCamera();
+        // updateCamera();  // DISABLED - camera streams via WebSocket
         updateDiagnostics();
         updateTerminal();
     </script>
