@@ -148,8 +148,8 @@ class WebInterface:
             try:
                 result = self.command_callback(cmd.command)
 
-                # Broadcast to WebSocket clients
-                await self.broadcast(f"COMMAND: {cmd.command}")
+                # Don't broadcast command here - frontend already shows it with '>' prefix
+                # Only the response will be broadcast by mission_agent
 
                 return MissionResponse(
                     success=result.get("success", False),
