@@ -87,7 +87,7 @@ class WebInterface:
             "robot_mode": "unknown",
             "topics_available": [],
             "action_servers": [],
-            "last_update": None
+            "last_update": None,
         }
 
         # Terminal buffer for command history
@@ -104,7 +104,7 @@ class WebInterface:
             "agent_percentage": 0.0,
             "avg_agent_duration": 0.0,
             "avg_total_duration": 0.0,
-            "command_count": 0
+            "command_count": 0,
         }
 
         # Mock image storage (for testing without robot)
@@ -183,7 +183,9 @@ class WebInterface:
                 # Store in memory for quick access
                 self.mock_images[camera] = image_data
 
-                self.logger.info(f"Mock image uploaded: {filename} ({len(image_data)} bytes)")
+                self.logger.info(
+                    f"Mock image uploaded: {filename} ({len(image_data)} bytes)"
+                )
 
                 # Broadcast to WebSocket clients
                 await self.broadcast(f"MOCK_IMAGE_UPLOADED: {camera} - {filename}")
@@ -250,31 +252,30 @@ class WebInterface:
                 self.active_connections.remove(websocket)
                 self.logger.info("WebSocket client disconnected")
 
-
         @app.get("/api/camera/latest")
         async def get_camera_frame():
             """Get latest camera frame as base64 encoded image."""
             if self.latest_camera_frame:
-                b64_image = base64.b64encode(self.latest_camera_frame).decode('utf-8')
+                b64_image = base64.b64encode(self.latest_camera_frame).decode("utf-8")
                 return {"image": b64_image, "available": True}
             return {"image": None, "available": False}
-        
+
         @app.get("/api/diagnostics")
         async def get_diagnostics():
             """Get robot diagnostics information."""
             return self.diagnostics
-        
+
         @app.get("/api/terminal")
         async def get_terminal():
             """Get terminal buffer."""
             return {"lines": self.terminal_buffer[-100:]}
-        
+
         @app.get("/api/performance")
         async def get_performance():
             """Get performance metrics."""
             return {
                 "latest": self.latest_timing,
-                "history": self.performance_metrics[-20:]  # Last 20 for graphing
+                "history": self.performance_metrics[-20:],  # Last 20 for graphing
             }
 
         return app
@@ -330,13 +331,13 @@ class WebInterface:
 
     def get_mock_image(self, camera: str = "front") -> Optional[bytes]:
         """Get mock image data for specified camera.
-        
+
         This method can be called by vision skills to retrieve uploaded mock images
         for testing without robot hardware.
-        
+
         Args:
             camera: Camera name ('front', 'left', 'right')
-            
+
         Returns:
             Image data as bytes, or None if no mock image available
         """
@@ -346,10 +347,9 @@ class WebInterface:
         """Check if mock image exists for specified camera."""
         return camera in self.mock_images
 
-
     def update_camera_frame(self, image_data: bytes):
         """Update the latest camera frame.
-        
+
         Args:
             image_data: JPEG or PNG image bytes
         """
@@ -357,63 +357,69 @@ class WebInterface:
 
     def update_diagnostics(self, diagnostics: Dict[str, Any]):
         """Update diagnostics information.
-        
+
         Args:
             diagnostics: Dict containing robot_mode, topics_available, action_servers, etc.
         """
         import datetime
+
         self.diagnostics.update(diagnostics)
         self.diagnostics["last_update"] = datetime.datetime.now().isoformat()
 
     def add_terminal_line(self, line: str):
         """Add a line to the terminal buffer.
-        
+
         Args:
             line: Text line to add
         """
         import datetime
+
         timestamp = datetime.datetime.now().strftime("%H:%M:%S")
         self.terminal_buffer.append(f"[{timestamp}] {line}")
-        
+
         # Keep buffer at max size
         if len(self.terminal_buffer) > self.max_terminal_lines:
-            self.terminal_buffer = self.terminal_buffer[-self.max_terminal_lines:]
-    
+            self.terminal_buffer = self.terminal_buffer[-self.max_terminal_lines :]
+
     def update_performance_metrics(self, timing_info: Dict[str, Any]):
         """Update performance metrics with new timing information.
-        
+
         Args:
             timing_info: Dict containing agent_duration, total_duration, overhead_duration
         """
         import datetime
-        
+
         # Add timestamp to timing info
         timing_with_timestamp = timing_info.copy()
         timing_with_timestamp["timestamp"] = datetime.datetime.now().isoformat()
-        
+
         # Add to history
         self.performance_metrics.append(timing_with_timestamp)
-        
+
         # Keep only last N measurements
         if len(self.performance_metrics) > self.max_metrics:
-            self.performance_metrics = self.performance_metrics[-self.max_metrics:]
-        
+            self.performance_metrics = self.performance_metrics[-self.max_metrics :]
+
         # Calculate averages
         if self.performance_metrics:
-            avg_agent = sum(m["agent_duration"] for m in self.performance_metrics) / len(self.performance_metrics)
-            avg_total = sum(m["total_duration"] for m in self.performance_metrics) / len(self.performance_metrics)
+            avg_agent = sum(
+                m["agent_duration"] for m in self.performance_metrics
+            ) / len(self.performance_metrics)
+            avg_total = sum(
+                m["total_duration"] for m in self.performance_metrics
+            ) / len(self.performance_metrics)
         else:
             avg_agent = 0.0
             avg_total = 0.0
-        
+
         # Update latest timing with averages
         self.latest_timing = {
             **timing_info,
             "avg_agent_duration": avg_agent,
             "avg_total_duration": avg_total,
-            "command_count": len(self.performance_metrics)
+            "command_count": len(self.performance_metrics),
         }
-        
+
         self.logger.info(
             f"Performance metrics updated: "
             f"Agent {timing_info['agent_duration']:.2f}s "
