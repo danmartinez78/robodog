@@ -150,7 +150,7 @@
         .terminal {
             background: #000;
             border: 1px solid #333;
-            border-radius: 3px;
+            border-radius: 3px 3px 0 0; /* Rounded top only */
             padding: 15px;
             height: 400px;
             overflow-y: auto;
@@ -183,6 +183,35 @@
 
         .terminal-prompt {
             color: #888;
+        }
+
+        .terminal-panel {
+            grid-column: 1 / -1; /* Full width */
+        }
+
+        .terminal-input-container {
+            display: flex;
+            align-items: center;
+            background: #000;
+            border: 1px solid #333;
+            border-top: none;
+            border-radius: 0 0 3px 3px;
+            padding: 10px 15px;
+            gap: 10px;
+        }
+
+        .terminal-input {
+            flex: 1;
+            background: transparent;
+            border: none;
+            color: #5cb85c;
+            font-family: 'Courier New', monospace;
+            font-size: 1em;
+            outline: none;
+        }
+
+        .terminal-input::placeholder {
+            color: #555;
         }
 
         .status-box {
@@ -325,40 +354,41 @@
             </div>
         </div>
 
-        <div class="grid">
-            <!-- Terminal -->
-            <div class="panel">
-                <h2>TERMINAL</h2>
+                <div class="grid">
+            <!-- Terminal with integrated command input -->
+            <div class="panel terminal-panel">
+                <h2>MISSION TERMINAL</h2>
                 <div class="terminal" id="terminal">
                     <div class="terminal-line">
                         <span class="terminal-prompt">shadowhound@mission-control:~$</span> Waiting for output...
                     </div>
                 </div>
-            </div>
-
-            <!-- Mission Status -->
-            <div class="panel">
-                <h2>MISSION STATUS</h2>
-                <div class="status-box">
-                    <div id="status">Waiting for commands...</div>
+                <div class="terminal-input-container">
+                    <span class="terminal-prompt">shadowhound@mission-control:~$</span>
+                    <input type="text" id="commandInput" class="terminal-input"
+                        placeholder="Enter mission command..."
+                        onkeypress="if(event.key === 'Enter') sendCommand()"
+                        autocomplete="off">
                 </div>
             </div>
-        </div>
-
-        <!-- Command Center -->
-        <div class="panel">
-            <h2>COMMAND CENTER</h2>
-            <h3>Natural Language Command</h3>
-            <input type="text" id="commandInput" class="command-input"
-                placeholder="Enter mission command (e.g., 'Patrol the perimeter and report any anomalies')"
-                onkeypress="if(event.key === 'Enter') sendCommand()">
-            <button class="btn btn-primary" onclick="sendCommand()">EXECUTE</button>
         </div>
     </div>
 
     <script>
         let ws;
-        const statusDiv = document.getElementById('status');
+        const wsStatusSpan = document.getElementById('wsStatus');
+        const commandInput = document.getElementById('commandInput');
+        const cameraFeed = document.getElementById('cameraFeed');
+        const terminal = document.getElementById('terminal');
+        const robotMode = document.getElementById('robotMode');
+        const topicsCount = document.getElementById('topicsCount');
+        const actionCount = document.getElementById('actionCount');
+        const lastUpdate = document.getElementById('lastUpdate');
+        const topicList = document.getElementById('topicList');
+    </div>
+
+    <script>
+        let ws;
         const wsStatusSpan = document.getElementById('wsStatus');
         const commandInput = document.getElementById('commandInput');
         const cameraFeed = document.getElementById('cameraFeed');
@@ -391,9 +421,8 @@
                     return; // Don't log camera frames
                 }
                 
-                // Regular status message
+                // Regular status message - show in terminal only
                 addTerminalLine(event.data);
-                statusDiv.textContent = event.data;
             };
 
             ws.onclose = () => {
@@ -499,7 +528,6 @@
         }
 
         async function sendQuick(command) {
-            statusDiv.textContent = `⏳ Sending: ${command}`;
             addTerminalLine(`> ${command}`);
 
             try {
@@ -513,15 +541,12 @@
                 console.log('Response:', data);
 
                 if (data.success) {
-                    statusDiv.textContent = `✅ ${data.message}`;
                     addTerminalLine(`✅ SUCCESS: ${data.message}`);
                 } else {
-                    statusDiv.textContent = `❌ ${data.message}`;
                     addTerminalLine(`❌ ERROR: ${data.message}`);
                 }
             } catch (error) {
                 console.error('Error sending command:', error);
-                statusDiv.textContent = `❌ Error: ${error.message}`;
                 addTerminalLine(`❌ EXCEPTION: ${error.message}`);
             }
         }
