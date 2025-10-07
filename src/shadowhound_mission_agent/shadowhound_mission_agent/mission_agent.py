@@ -213,16 +213,15 @@ class MissionAgentNode(Node):
             # Broadcast the response and timing to all web clients
             if self.web:
                 response_preview = response[:200] if len(response) > 200 else response
-                self.web.broadcast_sync(f"✅ {response_preview}")
-
-                # Broadcast timing info
-                timing_msg = (
-                    f"⏱️  TIMING: Agent {timing_info['agent_duration']:.2f}s "
-                    f"| Overhead {timing_info['overhead_duration']:.3f}s "
-                    f"| Total {timing_info['total_duration']:.2f}s"
+                
+                # Combine response with timing info in one message
+                combined_msg = (
+                    f"✅ {response_preview}\n"
+                    f"⏱️  Agent {timing_info['agent_duration']:.2f}s | "
+                    f"Overhead {timing_info['overhead_duration']:.3f}s | "
+                    f"Total {timing_info['total_duration']:.2f}s"
                 )
-                self.web.broadcast_sync(timing_msg)
-                self.web.add_terminal_line(timing_msg)
+                self.web.broadcast_sync(combined_msg)
 
                 # Update performance metrics in web interface
                 self.web.update_performance_metrics(timing_info)
@@ -261,16 +260,15 @@ class MissionAgentNode(Node):
             # Broadcast to web interface
             if self.web:
                 response_preview = response[:200] if len(response) > 200 else response
-                self.web.broadcast_sync(f"✅ {response_preview}")
-
-                # Broadcast timing info
-                timing_msg = (
-                    f"⏱️  TIMING: Agent {timing_info['agent_duration']:.2f}s "
-                    f"| Overhead {timing_info['overhead_duration']:.3f}s "
-                    f"| Total {timing_info['total_duration']:.2f}s"
+                
+                # Combine response with timing info in one message
+                combined_msg = (
+                    f"✅ {response_preview}\n"
+                    f"⏱️  Agent {timing_info['agent_duration']:.2f}s | "
+                    f"Overhead {timing_info['overhead_duration']:.3f}s | "
+                    f"Total {timing_info['total_duration']:.2f}s"
                 )
-                self.web.broadcast_sync(timing_msg)
-                self.web.add_terminal_line(timing_msg)
+                self.web.broadcast_sync(combined_msg)
 
                 # Update performance metrics
                 self.web.update_performance_metrics(timing_info)
