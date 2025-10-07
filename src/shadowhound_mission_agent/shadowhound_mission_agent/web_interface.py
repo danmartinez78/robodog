@@ -124,8 +124,18 @@ class WebInterface:
         # Register routes
         @app.get("/", response_class=HTMLResponse)
         async def root():
-            """Serve main dashboard."""
-            return self._get_dashboard_html()
+            """Serve main dashboard with no-cache headers."""
+            from fastapi import Response
+            html_content = self._get_dashboard_html()
+            return Response(
+                content=html_content,
+                media_type="text/html",
+                headers={
+                    "Cache-Control": "no-cache, no-store, must-revalidate",
+                    "Pragma": "no-cache",
+                    "Expires": "0"
+                }
+            )
 
         @app.get("/api/health")
         async def health():
