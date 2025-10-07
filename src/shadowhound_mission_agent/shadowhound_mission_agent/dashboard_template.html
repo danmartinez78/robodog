@@ -401,40 +401,55 @@
 
         // WebSocket connection
         function connectWebSocket() {
-            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-            ws = new WebSocket(`${protocol}//${window.location.host}/ws/status`);
-
-            ws.onopen = () => {
-                console.log('WebSocket connected');
-                wsStatusSpan.textContent = 'CONNECTED';
-                wsStatusSpan.className = 'connection-status connected';
-            };
-
-            ws.onmessage = (event) => {
-                console.log('Status update:', event.data);
+            try {
+                const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+                const wsUrl = `${protocol}//${window.location.host}/ws/status`;
+                console.log('Attempting WebSocket connection to:', wsUrl);
                 
-                // Check if this is a camera frame
-                if (event.data.startsWith('CAMERA_FRAME:')) {
-                    const base64Data = event.data.substring(13); // Remove 'CAMERA_FRAME:' prefix
-                    const imgSrc = 'data:image/jpeg;base64,' + base64Data;
-                    cameraFeed.innerHTML = `<img src="${imgSrc}" alt="Robot camera feed">`;
-                    return; // Don't log camera frames
-                }
-                
-                // Regular status message - show in terminal only
-                addTerminalLine(event.data);
-            };
+                ws = new WebSocket(wsUrl);
 
-            ws.onclose = () => {
-                console.log('WebSocket disconnected');
-                wsStatusSpan.textContent = 'DISCONNECTED';
+                ws.onopen = () => {
+                    console.log('✅ WebSocket connected');
+                    wsStatusSpan.textContent = 'CONNECTED';
+                    wsStatusSpan.className = 'connection-status connected';
+                    
+                    // Send initial ping
+                    ws.send('ping');
+                };
+
+                ws.onmessage = (event) => {
+                    console.log('WebSocket message:', event.data);
+                    
+                    // Check if this is a camera frame
+                    if (event.data.startsWith('CAMERA_FRAME:')) {
+                        const base64Data = event.data.substring(13); // Remove 'CAMERA_FRAME:' prefix
+                        const imgSrc = 'data:image/jpeg;base64,' + base64Data;
+                        cameraFeed.innerHTML = `<img src="${imgSrc}" alt="Robot camera feed">`;
+                        return; // Don't log camera frames
+                    }
+                    
+                    // Regular status message - show in terminal only
+                    addTerminalLine(event.data);
+                };
+
+                ws.onclose = () => {
+                    console.log('❌ WebSocket disconnected, reconnecting in 3s...');
+                    wsStatusSpan.textContent = 'DISCONNECTED';
+                    wsStatusSpan.className = 'connection-status disconnected';
+                    setTimeout(connectWebSocket, 3000);
+                };
+
+                ws.onerror = (error) => {
+                    console.error('❌ WebSocket error:', error);
+                    wsStatusSpan.textContent = 'ERROR';
+                    wsStatusSpan.className = 'connection-status disconnected';
+                };
+            } catch (error) {
+                console.error('❌ Failed to create WebSocket:', error);
+                wsStatusSpan.textContent = 'ERROR';
                 wsStatusSpan.className = 'connection-status disconnected';
                 setTimeout(connectWebSocket, 3000);
-            };
-
-            ws.onerror = (error) => {
-                console.error('WebSocket error:', error);
-            };
+            }
         }
 
         // Update camera feed
