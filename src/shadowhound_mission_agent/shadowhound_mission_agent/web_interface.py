@@ -298,7 +298,7 @@ class WebInterface:
 </html>
             """
 
-        async def broadcast(self, message: str):
+    async def broadcast(self, message: str):
         """Broadcast message to all connected WebSocket clients."""
         if not self.active_connections:
             return
