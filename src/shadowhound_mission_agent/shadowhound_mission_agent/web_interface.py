@@ -271,13 +271,244 @@ class WebInterface:
 <html>
 <head><title>ShadowHound</title></head>
 <body>
-    <h1>ShadowHound Mission Control</h1>
-    <p>Template file not found. Please check dashboard_template.html</p>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <div class="header-left">
+                <h1>shadowhound@mission-control:~$</h1>
+                <div class="subtitle">autonomous robot control interface</div>
+            </div>
+            <div class="header-right">
+                <span id="wsStatus" class="connection-status disconnected">[OFFLINE]</span>
+            </div>
+        </div>
+        
+        <!-- Main Grid -->
+        <div class="main-grid">
+            <!-- Camera Feed Panel -->
+            <div class="panel camera-panel">
+                <div class="panel-header">camera_feed:</div>
+                <div class="camera-feed" id="cameraFeed">
+                    <div class="camera-placeholder">[ no signal ]</div>
+                </div>
+                
+                <!-- Mock Image Upload -->
+                <div class="upload-panel">
+                    <label class="upload-label">mock_image (testing):</label>
+                    <div class="file-input-wrapper">
+                        <input type="file" id="imageUpload" accept="image/*" onchange="uploadMockImage(event)">
+                        <div class="file-input-button">[ upload test image ]</div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Mission Control Panel -->
+            <div class="panel mission-panel">
+                <div class="panel-header">mission_log:</div>
+                <div class="status-display" id="status">
+                    <div class="log-entry">system ready. awaiting commands.</div>
+                </div>
+                <input 
+                    type="text" 
+                    id="commandInput" 
+                    class="command-input" 
+                    placeholder="$ enter command..."
+                    onkeypress="if(event.key === 'Enter') sendCommand()"
+                >
+                <button class="btn btn-primary" onclick="sendCommand()">[ execute ]</button>
+            </div>
+            
+            <!-- Diagnostics Panel -->
+            <div class="panel diagnostics-panel">
+                <div class="panel-header">diagnostics:</div>
+                <div class="diag-grid">
+                    <div class="diag-item">
+                        <div class="diag-label">status:</div>
+                        <div class="diag-value" id="diagStatus">IDLE</div>
+                    </div>
+                    <div class="diag-item">
+                        <div class="diag-label">battery:</div>
+                        <div class="diag-value" id="diagBattery">--</div>
+                    </div>
+                    <div class="diag-item">
+                        <div class="diag-label">position:</div>
+                        <div class="diag-value" id="diagPosition">0.0, 0.0</div>
+                    </div>
+                    <div class="diag-item">
+                        <div class="diag-label">connection:</div>
+                        <div class="diag-value" id="diagConnection">STANDBY</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        let ws;
+        const statusDiv = document.getElementById('status');
+        const wsStatusSpan = document.getElementById('wsStatus');
+        const commandInput = document.getElementById('commandInput');
+        const cameraFeed = document.getElementById('cameraFeed');
+        const diagStatus = document.getElementById('diagStatus');
+        const diagConnection = document.getElementById('diagConnection');
+        
+        // WebSocket connection
+        function connectWebSocket() {
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            ws = new WebSocket(`${protocol}//${window.location.host}/ws/status`);
+            
+            ws.onopen = () => {
+                console.log('WebSocket connected');
+                wsStatusSpan.textContent = '[ONLINE]';
+                wsStatusSpan.className = 'connection-status connected';
+                diagConnection.textContent = 'ONLINE';
+                addLogEntry('websocket connected');
+            };
+            
+            ws.onmessage = (event) => {
+                console.log('Status update:', event.data);
+                
+                // Check if this is a camera frame
+                if (event.data.startsWith('CAMERA_FRAME:')) {
+                    const base64Data = event.data.substring(13); // Remove 'CAMERA_FRAME:' prefix
+                    const imgSrc = 'data:image/jpeg;base64,' + base64Data;
+                    cameraFeed.innerHTML = `<img src="${imgSrc}" alt="Robot camera feed">`;
+                    return; // Don't log camera frames
+                }
+                
+                // Regular status message
+                addLogEntry(event.data.toLowerCase());
+                
+                // Update diagnostics
+                if (event.data.includes('EXECUTING')) {
+                    diagStatus.textContent = 'ACTIVE';
+                } else if (event.data.includes('COMPLETED')) {
+                    diagStatus.textContent = 'IDLE';
+                }
+            };
+            
+            ws.onclose = () => {
+                console.log('WebSocket disconnected');
+                wsStatusSpan.textContent = '[OFFLINE]';
+                wsStatusSpan.className = 'connection-status disconnected';
+                diagConnection.textContent = 'OFFLINE';
+                addLogEntry('websocket disconnected', 'error');
+                // Reconnect after 3 seconds
+                setTimeout(connectWebSocket, 3000);
+            };
+            
+            ws.onerror = (error) => {
+                console.error('WebSocket error:', error);
+                addLogEntry('websocket error', 'error');
+            };
+        }
+        
+        function addLogEntry(message, type = 'info') {
+            const entry = document.createElement('div');
+            entry.className = 'log-entry';
+            
+            const timestamp = new Date().toLocaleTimeString('en-US', { hour12: false });
+            const prefix = type === 'error' ? '[!]' : '[>]';
+            
+            entry.textContent = `${timestamp} ${prefix} ${message}`;
+            
+            if (type === 'error') {
+                entry.style.color = '#ff0000';
+            }
+            
+            statusDiv.appendChild(entry);
+            statusDiv.scrollTop = statusDiv.scrollHeight;
+            
+            // Keep only last 50 entries
+            while (statusDiv.children.length > 50) {
+                statusDiv.removeChild(statusDiv.firstChild);
+            }
+        }
+        
+        // Send command via REST API
+        async function sendCommand() {
+            const command = commandInput.value.trim();
+            if (!command) {
+                addLogEntry('no command entered', 'error');
+                return;
+            }
+            
+            addLogEntry(`executing: ${command}`);
+            diagStatus.textContent = 'ACTIVE';
+            commandInput.value = '';
+            
+            try {
+                const response = await fetch('/api/mission', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({command: command})
+                });
+                
+                const data = await response.json();
+                console.log('Response:', data);
+                
+                if (data.success) {
+                    addLogEntry(`completed: ${data.message}`);
+                    diagStatus.textContent = 'IDLE';
+                } else {
+                    addLogEntry(`failed: ${data.message}`, 'error');
+                    diagStatus.textContent = 'ERROR';
+                }
+            } catch (error) {
+                console.error('Error sending command:', error);
+                addLogEntry(`system error: ${error.message}`, 'error');
+                diagStatus.textContent = 'ERROR';
+            }
+        }
+        
+        // Mock image upload
+        async function uploadMockImage(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            
+            addLogEntry(`uploading: ${file.name}`);
+            
+            // Display image in camera feed
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                cameraFeed.innerHTML = `<img src="${e.target.result}" alt="Mock camera feed">`;
+                addLogEntry('mock image loaded');
+            };
+            reader.readAsDataURL(file);
+            
+            // Upload to backend
+            const formData = new FormData();
+            formData.append('image', file);
+            formData.append('camera', 'front');
+            
+            try {
+                const response = await fetch('/api/mock/image', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    addLogEntry(`uploaded: ${data.filename}`);
+                } else {
+                    addLogEntry(`upload failed: ${data.message}`, 'error');
+                }
+            } catch (error) {
+                console.error('Error uploading image:', error);
+                addLogEntry(`upload error: ${error.message}`, 'error');
+            }
+        }
+        
+        // Initialize
+        connectWebSocket();
+        addLogEntry('system initialized');
+    </script>
 </body>
 </html>
             """
 
-        async def broadcast(self, message: str):
+    async def broadcast(self, message: str):
         """Broadcast message to all connected WebSocket clients."""
         if not self.active_connections:
             return
