@@ -590,6 +590,16 @@ class WebInterface:
             
             ws.onmessage = (event) => {
                 console.log('Status update:', event.data);
+                
+                // Check if this is a camera frame
+                if (event.data.startsWith('CAMERA_FRAME:')) {
+                    const base64Data = event.data.substring(13); // Remove 'CAMERA_FRAME:' prefix
+                    const imgSrc = 'data:image/jpeg;base64,' + base64Data;
+                    cameraFeed.innerHTML = `<img src="${imgSrc}" alt="Robot camera feed">`;
+                    return; // Don't log camera frames
+                }
+                
+                // Regular status message
                 addLogEntry(event.data.toLowerCase());
                 
                 // Update diagnostics

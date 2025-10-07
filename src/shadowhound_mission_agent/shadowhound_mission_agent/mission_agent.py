@@ -91,6 +91,30 @@ class MissionAgentNode(Node):
             String, "mission_command", self.mission_callback, 10
         )
 
+        # Subscribe to camera feed if web interface is enabled
+        self.camera_sub = None
+        if enable_web:
+            try:
+                from sensor_msgs.msg import CompressedImage
+                from rclpy.qos import QoSProfile, QoSReliabilityPolicy, QoSHistoryPolicy
+                
+                # Use BEST_EFFORT QoS to match camera publisher
+                qos_profile = QoSProfile(
+                    reliability=QoSReliabilityPolicy.BEST_EFFORT,
+                    history=QoSHistoryPolicy.KEEP_LAST,
+                    depth=1
+                )
+                
+                self.camera_sub = self.create_subscription(
+                    CompressedImage,
+                    "/camera/compressed",
+                    self._camera_callback,
+                    qos_profile
+                )
+                self.get_logger().info("📷 Subscribed to camera feed: /camera/compressed")
+            except Exception as e:
+                self.get_logger().warn(f"Failed to subscribe to camera: {e}")
+
         # Create ROS publishers
         self.status_pub = self.create_publisher(String, "mission_status", 10)
 
@@ -248,6 +272,29 @@ class MissionAgentNode(Node):
             # Broadcast to web interface
             if self.web:
                 self.web.broadcast_sync(f"❌ FAILED: {command} - {str(e)}")
+
+    def _camera_callback(self, msg):
+        """Handle incoming camera images and forward to web interface."""
+        if not self.web:
+            return
+        
+        try:
+            import base64
+            
+            # Convert compressed image to base64
+            image_base64 = base64.b64encode(msg.data).decode('utf-8')
+            
+            # Send to web interface via WebSocket
+            # Format: CAMERA_FRAME:<base64_data>
+            self.web.broadcast_sync(f"CAMERA_FRAME:{image_base64}")
+            
+        except Exception as e:
+            # Only log errors occasionally to avoid spam
+            if not hasattr(self, '_camera_error_count'):
+                self._camera_error_count = 0
+            self._camera_error_count += 1
+            if self._camera_error_count % 100 == 0:
+                self.get_logger().warn(f"Camera callback error (x{self._camera_error_count}): {e}")
 
     def destroy_node(self):
         """Clean up resources."""
