@@ -542,11 +542,10 @@
                 const data = await response.json();
                 console.log('Response:', data);
 
-                if (data.success) {
-                    addTerminalLine(`✅ SUCCESS: ${data.message}`);
-                } else {
-                    addTerminalLine(`❌ ERROR: ${data.message}`);
-                }
+                // Don't add success/error here - the mission agent broadcasts
+                // results via WebSocket, so we'd get duplicate messages
+                // The response is already shown via WebSocket broadcast
+
             } catch (error) {
                 console.error('Error sending command:', error);
                 addTerminalLine(`❌ EXCEPTION: ${error.message}`);

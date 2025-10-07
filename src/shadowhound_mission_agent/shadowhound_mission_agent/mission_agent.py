@@ -96,7 +96,7 @@ class MissionAgentNode(Node):
         self.camera_sub = None
         if enable_web:
             try:
-                from sensor_msgs.msg import CompressedImage
+                from sensor_msgs.msg import Image
                 from rclpy.qos import QoSProfile, QoSReliabilityPolicy, QoSHistoryPolicy
                 
                 # Use BEST_EFFORT QoS to match camera publisher
@@ -107,12 +107,12 @@ class MissionAgentNode(Node):
                 )
                 
                 self.camera_sub = self.create_subscription(
-                    CompressedImage,
-                    "/camera/compressed",
+                    Image,
+                    "/camera/image_raw",
                     self._camera_callback,
                     qos_profile
                 )
-                self.get_logger().info("📷 Subscribed to camera feed: /camera/compressed")
+                self.get_logger().info("📷 Subscribed to camera feed: /camera/image_raw")
             except Exception as e:
                 self.get_logger().warn(f"Failed to subscribe to camera: {e}")
 
@@ -286,9 +286,31 @@ class MissionAgentNode(Node):
         
         try:
             import base64
+            import cv2
+            import numpy as np
             
-            # Convert compressed image to base64
-            image_base64 = base64.b64encode(msg.data).decode('utf-8')
+            # Convert ROS Image message to numpy array
+            # Assuming RGB8 or BGR8 encoding (common for cameras)
+            if msg.encoding == 'rgb8':
+                image_np = np.frombuffer(msg.data, dtype=np.uint8).reshape(msg.height, msg.width, 3)
+            elif msg.encoding == 'bgr8':
+                image_np = np.frombuffer(msg.data, dtype=np.uint8).reshape(msg.height, msg.width, 3)
+                image_np = cv2.cvtColor(image_np, cv2.COLOR_BGR2RGB)
+            else:
+                # Unsupported encoding - skip
+                if not hasattr(self, '_encoding_warned'):
+                    self.get_logger().warn(f"Unsupported image encoding: {msg.encoding}")
+                    self._encoding_warned = True
+                return
+            
+            # Encode to JPEG
+            success, buffer = cv2.imencode('.jpg', cv2.cvtColor(image_np, cv2.COLOR_RGB2BGR), 
+                                           [cv2.IMWRITE_JPEG_QUALITY, 80])
+            if not success:
+                return
+            
+            # Convert to base64
+            image_base64 = base64.b64encode(buffer.tobytes()).decode('utf-8')
             
             # Send to web interface via WebSocket
             # Format: CAMERA_FRAME:<base64_data>
