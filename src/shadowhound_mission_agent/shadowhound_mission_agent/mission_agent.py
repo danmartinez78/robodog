@@ -34,7 +34,7 @@ class MissionAgentNode(Node):
         super().__init__("shadowhound_mission_agent")
 
         # Declare ROS parameters
-        self.declare_parameter("agent_backend", "cloud")  # 'cloud' or 'local'
+        self.declare_parameter("agent_backend", "openai")  # 'openai' or 'ollama'
         self.declare_parameter(
             "use_planning_agent", False
         )  # Use PlanningAgent instead of OpenAIAgent
@@ -42,7 +42,14 @@ class MissionAgentNode(Node):
         self.declare_parameter("web_port", 8080)  # Web interface port
         self.declare_parameter("robot_ip", "192.168.1.103")  # Robot IP address
         self.declare_parameter("webrtc_api_topic", "webrtc_req")  # WebRTC API topic
-        self.declare_parameter("agent_model", "gpt-4-turbo")  # LLM model
+        
+        # OpenAI backend parameters
+        self.declare_parameter("openai_model", "gpt-4-turbo")  # OpenAI model
+        self.declare_parameter("openai_base_url", "https://api.openai.com/v1")
+        
+        # Ollama backend parameters
+        self.declare_parameter("ollama_base_url", "http://localhost:11434")
+        self.declare_parameter("ollama_model", "llama3.1:70b")
 
         # Get parameters
         agent_backend = self.get_parameter("agent_backend").value
@@ -51,16 +58,24 @@ class MissionAgentNode(Node):
         web_port = self.get_parameter("web_port").value
         robot_ip = self.get_parameter("robot_ip").value
         webrtc_api_topic = self.get_parameter("webrtc_api_topic").value
-        agent_model = self.get_parameter("agent_model").value
+        
+        openai_model = self.get_parameter("openai_model").value
+        openai_base_url = self.get_parameter("openai_base_url").value
+        ollama_base_url = self.get_parameter("ollama_base_url").value
+        ollama_model = self.get_parameter("ollama_model").value
 
         self.get_logger().info("Configuration:")
         self.get_logger().info(f"  Agent backend: {agent_backend}")
         self.get_logger().info(f"  Use planning: {use_planning}")
+        if agent_backend == "openai":
+            self.get_logger().info(f"  OpenAI model: {openai_model}")
+        elif agent_backend == "ollama":
+            self.get_logger().info(f"  Ollama URL: {ollama_base_url}")
+            self.get_logger().info(f"  Ollama model: {ollama_model}")
         self.get_logger().info(f"  Web interface: {enable_web}")
         if enable_web:
             self.get_logger().info(f"  Web port: {web_port}")
         self.get_logger().info(f"  Robot IP: {robot_ip}")
-        self.get_logger().info(f"  Agent model: {agent_model}")
 
         # Log connection diagnostics
         self._log_connection_diagnostics()
@@ -73,7 +88,10 @@ class MissionAgentNode(Node):
             use_planning_agent=use_planning,
             robot_ip=robot_ip,
             webrtc_api_topic=webrtc_api_topic,
-            agent_model=agent_model,
+            openai_model=openai_model,
+            openai_base_url=openai_base_url,
+            ollama_base_url=ollama_base_url,
+            ollama_model=ollama_model,
         )
 
         # Create mission executor (uses ROS logging via this node's logger)

@@ -1,0 +1,36 @@
+# ShadowHound Configuration: OpenAI Cloud (Fallback)
+# 
+# Use this configuration as a fallback when local Ollama is unavailable
+# or when you need the highest quality responses.
+#
+# Deployment: Any platform -> OpenAI cloud API
+# Performance: ~10-15s response time (slower but reliable)
+#
+# Prerequisites:
+# 1. OPENAI_API_KEY environment variable set
+# 2. Internet connectivity
+# 3. OpenAI API credits
+#
+# Usage:
+#   export OPENAI_API_KEY="sk-..."
+#   ros2 launch shadowhound_bringup shadowhound.launch.py \
+#       config:=configs/cloud_openai.yaml
+
+# Agent backend configuration
+agent_backend: "openai"
+use_planning_agent: false
+
+# OpenAI settings
+openai_model: "gpt-4-turbo"  # Or "gpt-3.5-turbo" for faster responses
+openai_base_url: "https://api.openai.com/v1"
+
+# Robot settings
+robot_ip: "192.168.1.103"  # Go2 robot IP
+webrtc_api_topic: "webrtc_req"
+
+# Web interface
+enable_web_interface: true
+web_port: 8080
+
+# Note: Requires OPENAI_API_KEY environment variable!
+# Trade-off: More reliable but 10-20x slower than local Ollama

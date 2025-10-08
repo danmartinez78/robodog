@@ -1,0 +1,34 @@
+# ShadowHound Configuration: Laptop Development with Gaming PC Ollama
+# 
+# Use this configuration when developing on laptop and using Ollama
+# running on a separate gaming PC for LLM inference.
+#
+# Deployment: Laptop devcontainer -> Gaming PC Ollama (via network)
+# Performance: ~0.5-1s response time (24x faster than cloud)
+#
+# Prerequisites:
+# 1. Ollama running on gaming PC (port 11434)
+# 2. Gaming PC firewall allows connections from laptop
+# 3. Model downloaded: ollama pull llama3.1:70b
+#
+# Usage:
+#   ros2 launch shadowhound_bringup shadowhound.launch.py \
+#       config:=configs/laptop_dev_ollama.yaml
+
+# Agent backend configuration
+agent_backend: "ollama"
+use_planning_agent: false
+
+# Ollama settings - REPLACE WITH YOUR GAMING PC IP
+ollama_base_url: "http://192.168.1.100:11434"  # <-- Change this!
+ollama_model: "llama3.1:70b"  # 70B for best quality
+
+# Robot settings
+robot_ip: "192.168.1.103"  # Go2 robot IP
+webrtc_api_topic: "webrtc_req"
+
+# Web interface
+enable_web_interface: true
+web_port: 8080
+
+# Note: No OPENAI_API_KEY needed for Ollama backend!

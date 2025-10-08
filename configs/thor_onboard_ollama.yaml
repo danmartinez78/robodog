@@ -1,0 +1,34 @@
+# ShadowHound Configuration: Thor Onboard Ollama
+# 
+# Use this configuration when running on Thor (Jetson AGX Orin) with
+# Ollama installed locally for fully autonomous operation.
+#
+# Deployment: Thor onboard -> Thor local Ollama (localhost)
+# Performance: ~1-2s response time (no network latency)
+#
+# Prerequisites:
+# 1. Ollama installed on Thor
+# 2. Model downloaded: ollama pull llama3.1:13b
+# 3. Sufficient disk space for model (~7GB for 13B)
+#
+# Usage:
+#   ros2 launch shadowhound_bringup shadowhound.launch.py \
+#       config:=configs/thor_onboard_ollama.yaml
+
+# Agent backend configuration
+agent_backend: "ollama"
+use_planning_agent: false
+
+# Ollama settings - using localhost (local inference)
+ollama_base_url: "http://localhost:11434"
+ollama_model: "llama3.1:13b"  # 13B fits better on Orin memory
+
+# Robot settings
+robot_ip: "192.168.1.103"  # Go2 robot IP
+webrtc_api_topic: "webrtc_req"
+
+# Web interface
+enable_web_interface: true
+web_port: 8080
+
+# Note: Fully autonomous - no cloud connectivity required!

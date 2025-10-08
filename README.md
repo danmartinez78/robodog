@@ -53,7 +53,20 @@ See [`SCRIPTS.md`](SCRIPTS.md) for all available scripts and options:
 ### Prerequisites
 - **Docker** with dev containers support
 - **VS Code** with [Dev Containers extension](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-containers)
-- **OpenAI API Key** - Get one from [OpenAI Platform](https://platform.openai.com/api-keys)
+- **LLM Backend** - Choose one:
+  - **OpenAI API Key** (cloud, slower but reliable) - Get from [OpenAI Platform](https://platform.openai.com/api-keys)
+  - **Ollama** (self-hosted, 24x faster!) - See [Ollama Setup Guide](docs/OLLAMA_SETUP.md) ⚡
+
+### Backend Options
+
+ShadowHound supports two LLM backends:
+
+| Backend | Response Time | Setup | Best For |
+|---------|--------------|-------|----------|
+| **Ollama** ⚡ | 0.5-2s | Install locally or on gaming PC | Development, production |
+| **OpenAI Cloud** | 10-15s | Just add API key | Fallback, highest quality |
+
+**Recommended**: Use Ollama for **24x faster** iteration! See the [Ollama Setup Guide](docs/OLLAMA_SETUP.md) for installation and configuration.
 
 ### Dev Container Features
 The container provides everything you need:
