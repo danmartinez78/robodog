@@ -42,11 +42,11 @@ class MissionAgentNode(Node):
         self.declare_parameter("web_port", 8080)  # Web interface port
         self.declare_parameter("robot_ip", "192.168.1.103")  # Robot IP address
         self.declare_parameter("webrtc_api_topic", "webrtc_req")  # WebRTC API topic
-        
+
         # OpenAI backend parameters
         self.declare_parameter("openai_model", "gpt-4-turbo")  # OpenAI model
         self.declare_parameter("openai_base_url", "https://api.openai.com/v1")
-        
+
         # Ollama backend parameters
         self.declare_parameter("ollama_base_url", "http://localhost:11434")
         self.declare_parameter("ollama_model", "llama3.1:70b")
@@ -58,7 +58,7 @@ class MissionAgentNode(Node):
         web_port = self.get_parameter("web_port").value
         robot_ip = self.get_parameter("robot_ip").value
         webrtc_api_topic = self.get_parameter("webrtc_api_topic").value
-        
+
         openai_model = self.get_parameter("openai_model").value
         openai_base_url = self.get_parameter("openai_base_url").value
         ollama_base_url = self.get_parameter("ollama_base_url").value

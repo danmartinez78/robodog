@@ -38,27 +38,27 @@ def generate_launch_description():
         default_value="false",
         description="Use planning agent for multi-step missions (true/false)",
     )
-    
+
     # OpenAI backend arguments
     openai_model_arg = DeclareLaunchArgument(
         "openai_model",
         default_value="gpt-4-turbo",
         description="OpenAI model name (e.g., gpt-4-turbo, gpt-3.5-turbo)",
     )
-    
+
     openai_base_url_arg = DeclareLaunchArgument(
         "openai_base_url",
         default_value="https://api.openai.com/v1",
         description="OpenAI API base URL",
     )
-    
+
     # Ollama backend arguments
     ollama_base_url_arg = DeclareLaunchArgument(
         "ollama_base_url",
         default_value="http://localhost:11434",
         description="Ollama server URL (e.g., http://192.168.1.100:11434 for remote)",
     )
-    
+
     ollama_model_arg = DeclareLaunchArgument(
         "ollama_model",
         default_value="llama3.1:70b",

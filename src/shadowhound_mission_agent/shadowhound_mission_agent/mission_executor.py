@@ -42,11 +42,11 @@ except ImportError as e:
 @dataclass
 class MissionExecutorConfig:
     """Configuration for MissionExecutor.
-    
+
     Backend Options:
     - 'openai': Use OpenAI cloud API (requires OPENAI_API_KEY)
     - 'ollama': Use Ollama (self-hosted, can be local or remote)
-    
+
     Deployment Scenarios:
     - Development: agent_backend='ollama', ollama_base_url='http://<gaming-pc-ip>:11434'
     - Thor Production: agent_backend='ollama', ollama_base_url='http://localhost:11434'
@@ -57,15 +57,15 @@ class MissionExecutorConfig:
     use_planning_agent: bool = False  # Use PlanningAgent vs OpenAIAgent
     robot_ip: str = "192.168.1.103"  # Robot IP address
     webrtc_api_topic: str = "webrtc_req"  # ROS topic for WebRTC API commands
-    
+
     # OpenAI backend settings (cloud)
     openai_model: str = "gpt-4-turbo"  # OpenAI model name
     openai_base_url: str = "https://api.openai.com/v1"  # OpenAI API endpoint
-    
+
     # Ollama backend settings (self-hosted)
     ollama_base_url: str = "http://localhost:11434"  # Ollama server URL
     ollama_model: str = "llama3.1:70b"  # Ollama model name
-    
+
     # Token limits (apply to both backends)
     max_output_tokens: int = 4096  # Max tokens for model output
     max_input_tokens: int = 128000  # Max tokens for model input
@@ -205,31 +205,28 @@ class MissionExecutor:
 
         # Configure OpenAI client based on backend
         from openai import OpenAI
-        
+
         if self.config.agent_backend == "ollama":
             # Use Ollama backend (self-hosted LLM)
             self.logger.info(f"Using Ollama backend at {self.config.ollama_base_url}")
             client = OpenAI(
                 base_url=f"{self.config.ollama_base_url}/v1",
-                api_key="ollama"  # Ollama doesn't validate API keys
+                api_key="ollama",  # Ollama doesn't validate API keys
             )
             model_name = self.config.ollama_model
             self.logger.info(f"Ollama model: {model_name}")
-            
+
         elif self.config.agent_backend == "openai":
             # Use OpenAI cloud backend
             api_key = os.getenv("OPENAI_API_KEY")
             if not api_key:
                 self.logger.warning("OPENAI_API_KEY not set, agent may not function")
-            
+
             self.logger.info("Using OpenAI cloud backend")
-            client = OpenAI(
-                base_url=self.config.openai_base_url,
-                api_key=api_key
-            )
+            client = OpenAI(base_url=self.config.openai_base_url, api_key=api_key)
             model_name = self.config.openai_model
             self.logger.info(f"OpenAI model: {model_name}")
-            
+
         else:
             raise ValueError(
                 f"Unknown agent_backend: {self.config.agent_backend}. "
