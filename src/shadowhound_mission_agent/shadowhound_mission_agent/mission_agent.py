@@ -13,8 +13,10 @@ The actual mission execution logic is in MissionExecutor (pure Python).
 import rclpy
 from rclpy.node import Node
 from std_msgs.msg import String
-from sensor_msgs.msg import CompressedImage
+from sensor_msgs.msg import Image
 import os
+import cv2
+import numpy as np
 from typing import Optional, Dict, Any
 from .web_interface import WebInterface
 from .mission_executor import MissionExecutor, MissionExecutorConfig
@@ -92,9 +94,9 @@ class MissionAgentNode(Node):
             String, "mission_command", self.mission_callback, 10
         )
 
-        # Subscribe to camera feed for web UI
+        # Subscribe to camera feed for web UI (using raw image with JPEG encoding)
         self.camera_sub = self.create_subscription(
-            CompressedImage, "/camera/compressed", self.camera_callback, 10
+            Image, "/camera/image_raw", self.camera_callback, 10
         )
 
         # Create ROS publishers
@@ -213,7 +215,7 @@ class MissionAgentNode(Node):
             # Broadcast the response and timing to all web clients
             if self.web:
                 response_preview = response[:200] if len(response) > 200 else response
-                
+
                 # Combine response with timing info in one message
                 combined_msg = (
                     f"✅ {response_preview}\n"
@@ -260,7 +262,7 @@ class MissionAgentNode(Node):
             # Broadcast to web interface
             if self.web:
                 response_preview = response[:200] if len(response) > 200 else response
-                
+
                 # Combine response with timing info in one message
                 combined_msg = (
                     f"✅ {response_preview}\n"
@@ -283,11 +285,42 @@ class MissionAgentNode(Node):
                 self.web.broadcast_sync(f"❌ FAILED: {command} - {str(e)}")
                 self.web.add_terminal_line(f"❌ FAILED: {command} - {str(e)}")
 
-    def camera_callback(self, msg: CompressedImage):
-        """Handle camera feed for web UI."""
-        if self.web:
-            # Forward compressed image data to web interface
-            self.web.update_camera_frame(bytes(msg.data))
+    def camera_callback(self, msg: Image):
+        """Handle camera feed for web UI.
+        
+        Converts raw ROS Image message to JPEG format for efficient web streaming.
+        """
+        if not self.web:
+            return
+            
+        try:
+            # Convert ROS Image to numpy array
+            # Handle different encodings (rgb8, bgr8, mono8)
+            if msg.encoding == 'rgb8':
+                # Convert RGB to BGR for OpenCV
+                np_arr = np.frombuffer(msg.data, dtype=np.uint8).reshape(msg.height, msg.width, 3)
+                cv_image = cv2.cvtColor(np_arr, cv2.COLOR_RGB2BGR)
+            elif msg.encoding == 'bgr8':
+                # Already in BGR format
+                np_arr = np.frombuffer(msg.data, dtype=np.uint8).reshape(msg.height, msg.width, 3)
+                cv_image = np_arr
+            elif msg.encoding == 'mono8':
+                # Grayscale image
+                cv_image = np.frombuffer(msg.data, dtype=np.uint8).reshape(msg.height, msg.width)
+            else:
+                self.get_logger().warn(f"Unsupported image encoding: {msg.encoding}")
+                return
+            
+            # Encode as JPEG (quality=85 for good balance of size/quality)
+            encode_param = [int(cv2.IMWRITE_JPEG_QUALITY), 85]
+            _, jpeg_buffer = cv2.imencode('.jpg', cv_image, encode_param)
+            jpeg_bytes = jpeg_buffer.tobytes()
+            
+            # Forward JPEG data to web interface
+            self.web.update_camera_frame(jpeg_bytes)
+            
+        except Exception as e:
+            self.get_logger().error(f"Camera callback error: {e}")
 
     def update_diagnostics(self):
         """Update diagnostics information for web UI."""

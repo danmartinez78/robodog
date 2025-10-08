@@ -2,7 +2,9 @@
 
 An autonomous mobile robot system that combines ROS2 navigation with LLM/VLM-driven task planning for natural language mission execution on Unitree Go2.
 
-**Status**: 🎯 Phase 0 (Bootstrap) - Package scaffolding in progress
+**Status**: 🚀 Phase 1 (Active Development) - Mission agent operational, VLM integration in progress  
+**Latest**: PlanningAgent enabled for multi-step execution, performance metrics in web UI  
+**Branch**: `feature/dimos-integration` (main development), `feature/vlm-integration` (vision skills)
 
 ---
 
@@ -30,7 +32,13 @@ That's it! The script handles everything:
 - ✓ Launches the system
 - ✓ Opens web dashboard at http://localhost:8080
 
-Try a mission: "patrol around the room" 🤖
+Try a mission: "rotate to the right and take a step back" 🤖
+
+**New Features**:
+- 🎯 Multi-step sequential execution (PlanningAgent)
+- 📊 Real-time performance metrics in web UI
+- 📹 Live camera feed integration
+- ⏱️ Detailed timing instrumentation
 
 ### 📚 For More Control
 
@@ -79,15 +87,16 @@ ShadowHound uses a **four-layer architecture**:
 └─ Hardware ────┘  Unitree Go2 quadruped
 ```
 
-### Core Packages (to be created)
+### Core Packages
 
-- **`shadowhound_interfaces/`** - Custom ROS2 messages/services/actions
-- **`shadowhound_robot/`** - Hardware interface layer
-- **`shadowhound_skills/`** - Skills registry and implementations
-- **`shadowhound_agent/`** - Mission planner and LLM integration
-- **`shadowhound_bringup/`** - Launch files and configurations
+- **`shadowhound_mission_agent/`** ✅ - ROS2 node with DIMOS integration, web UI, mission execution
+- **`shadowhound_utils/`** ✅ - Utilities including robot interface and skills framework
+- **`shadowhound_skills/`** ✅ - Vision skills package with VLM integration (Qwen, object detection)
+- **`shadowhound_bringup/`** ✅ - Launch files and configurations
 
-See [`docs/project.md`](docs/project.md) for detailed architecture.
+**Integration**: Built on [DIMOS framework](https://github.com/Dorteel/dimos-unitree) with Unitree Go2 SDK
+
+See [`docs/project.md`](docs/project_context.md) and [`docs/DIMOS_VISION_CAPABILITIES.md`](docs/DIMOS_VISION_CAPABILITIES.md) for detailed architecture.
 
 ---
 
@@ -189,43 +198,97 @@ GO2_MODE=webrtc                       # webrtc or ethernet
 
 # Agent Configuration (set when needed)
 AGENT_BACKEND=cloud                   # cloud or local
-OPENAI_API_KEY=<your-key>             # For cloud LLM
+OPENAI_API_KEY=<your-key>             # For cloud LLM (required)
+ALIBABA_API_KEY=<your-key>            # For Qwen VLM (optional, for vision skills)
+
+# Agent Settings
+USE_PLANNING_AGENT=true               # true=sequential multi-step, false=single-shot (default: true)
+AGENT_MODEL=gpt-4-turbo               # LLM model (gpt-4-turbo, gpt-3.5-turbo)
 ```
 
 ---
 
 ## Current Status & Roadmap
 
-### ✅ Phase 0: Bootstrap (CURRENT)
-- [x] Devcontainer with ROS2 Humble
-- [x] Workspace structure
-- [ ] Create package scaffolding
-- [ ] First build and test
+### ✅ Phase 0: Bootstrap (COMPLETE)
+- [x] Devcontainer with ROS2 Humble + DIMOS
+- [x] Workspace structure and build system
+- [x] Package scaffolding created
+- [x] Integration with go2_ros2_sdk
 
-### 🔄 Phase 1: Basic Skills (NEXT)
-- [ ] Skills registry implementation
-- [ ] Basic skills (say, stop, rotate, snapshot)
-- [ ] Unit tests
+### ✅ Phase 1: Mission Agent (COMPLETE)
+- [x] DIMOS integration with OpenAI/PlanningAgent
+- [x] Web UI with real-time camera feed
+- [x] Mission execution via natural language
+- [x] Performance metrics and timing instrumentation
+- [x] Multi-step sequential execution (PlanningAgent)
+- [x] Robot skills framework (via DIMOS)
 
-### 🔜 Phase 2: Robot Integration
-- [ ] Import go2_ros2_sdk
-- [ ] Robot interface implementation
-- [ ] Hardware testing
+### 🔄 Phase 2: Vision Skills (IN PROGRESS - `feature/vlm-integration`)
+- [x] Vision skills package with 4 skills
+  - [x] SnapshotSkill - Capture and save images
+  - [x] DescribeSceneSkill - VLM scene description
+  - [x] LocateObjectSkill - VLM object detection with bounding boxes
+  - [x] DetectObjectsSkill - VLM multi-object detection
+- [x] DIMOS Qwen VLM integration
+- [x] Comprehensive test suite (4/4 passing)
+- [ ] **NEXT**: Wire vision skills to mission_agent camera feed
+- [ ] **NEXT**: Register skills with DIMOS MyUnitreeSkills
+- [ ] End-to-end vision mission testing
 
-### 🔮 Phase 3: Agent Integration
-- [ ] LLM client
-- [ ] Mission planner
-- [ ] Natural language missions
+### 🔜 Phase 3: Performance Optimization
+- [ ] Collect baseline performance data
+- [ ] Analyze bottlenecks (cloud API vs DIMOS)
+- [ ] Optimize model selection (gpt-3.5-turbo for simple commands)
+- [ ] Add streaming responses for better UX
+- [ ] Target: <2s simple commands, <5s multi-step
 
-See [`docs/project.md`](docs/project.md) for complete roadmap and implementation phases.
+### 🔮 Phase 4: Advanced Features
+- [ ] Hybrid agent selection (OpenAI for simple, Planning for complex)
+- [ ] Local LLM option for offline operation
+- [ ] Advanced vision: depth estimation, 3D object tracking
+- [ ] Multi-robot coordination
+- [ ] Persistent memory and learning
+
+See [TODO.md](TODO.md) for detailed task tracking and [DEVLOG.md](DEVLOG.md) for development history.
 
 ---
 
 ## Key Documentation
 
-- **[`docs/project.md`](docs/project.md)** - Complete architecture and implementation plan
+### Architecture & Planning
+- **[`docs/project_context.md`](docs/project_context.md)** - Complete project context and architecture
 - **[`.github/copilot-instructions.md`](.github/copilot-instructions.md)** - AI agent development guide
-- **Package READMEs** - Each package will have detailed documentation
+- **[`docs/DIMOS_VISION_CAPABILITIES.md`](docs/DIMOS_VISION_CAPABILITIES.md)** - DIMOS vision system analysis
+
+### Recent Improvements
+- **[`docs/MULTI_STEP_EXECUTION_ISSUE.md`](docs/MULTI_STEP_EXECUTION_ISSUE.md)** - PlanningAgent vs OpenAIAgent guide
+- **[`docs/AGENT_QUICK_REFERENCE.txt`](docs/AGENT_QUICK_REFERENCE.txt)** - Agent selection quick reference
+- **[`docs/WEB_UI_PERFORMANCE_METRICS.md`](docs/WEB_UI_PERFORMANCE_METRICS.md)** - Performance monitoring guide
+- **[`docs/PERFORMANCE_ANALYSIS_PLAN.md`](docs/PERFORMANCE_ANALYSIS_PLAN.md)** - Optimization strategy
+- **[`docs/TIMING_DISPLAY_FIX.md`](docs/TIMING_DISPLAY_FIX.md)** - Clean terminal output fix
+
+### Package Documentation
+- **[`src/shadowhound_skills/README.md`](src/shadowhound_skills/README.md)** - Vision skills package guide
+- **[`src/shadowhound_mission_agent/`](src/shadowhound_mission_agent/)** - Mission agent implementation
+
+---
+
+## Recent Changes
+
+### October 7, 2025
+- ✅ **Multi-step execution fix**: Enabled PlanningAgent by default for proper sequential command execution
+- ✅ **Performance metrics**: Added real-time timing instrumentation to web UI
+- ✅ **Clean terminal output**: Combined timing info with responses to avoid clutter
+- ✅ **IndentationError fix**: Resolved web interface startup issue
+- ✅ **Comprehensive documentation**: Added 6 new docs (1,500+ lines) covering architecture, troubleshooting, and optimization strategies
+
+**Key Improvements**:
+- Commands like "rotate right and step back" now execute sequentially (not simultaneously)
+- Web UI shows agent duration, overhead, and total execution time with color-coded indicators
+- Performance averages calculated over last 50 commands for trend analysis
+
+See [DEVLOG.md](DEVLOG.md) for complete development history.
 
 ---
 
@@ -279,6 +342,56 @@ ros2 topic list
 
 # Check network (if using real robot)
 ros2 daemon stop && ros2 daemon start
+```
+
+### Mission Agent Issues
+
+**Problem**: Multi-step commands execute incorrectly
+```bash
+# Verify PlanningAgent is enabled (default since Oct 7, 2025)
+ros2 param get /shadowhound_mission_agent use_planning_agent
+# Should return: True
+
+# Check logs for "PlanningAgent initialized" (not "OpenAIAgent")
+```
+
+**Problem**: Performance seems slow
+```bash
+# This is EXPECTED with PlanningAgent (sequential execution)
+# Check web UI performance panel for timing breakdown
+# - Simple commands: ~1.5s (acceptable)
+# - Multi-step commands: ~3-5s (acceptable, ensures correctness)
+
+# See docs/PERFORMANCE_ANALYSIS_PLAN.md for optimization strategies
+```
+
+**Problem**: Web UI not showing performance metrics
+```bash
+# Rebuild mission_agent
+colcon build --packages-select shadowhound_mission_agent
+source install/setup.bash
+
+# Restart and check http://localhost:8080
+ros2 launch shadowhound_bringup shadowhound.launch.py
+```
+
+**Problem**: IndentationError on startup
+```bash
+# This was fixed in commit fa517f2
+# Pull latest changes:
+git pull origin feature/dimos-integration
+colcon build --packages-select shadowhound_mission_agent
+```
+
+### Vision Skills Issues
+
+**Problem**: Vision skills not working
+```bash
+# Check ALIBABA_API_KEY is set (required for Qwen VLM)
+echo $ALIBABA_API_KEY
+
+# Vision skills will gracefully skip if API key missing
+# See src/shadowhound_skills/README.md for setup
 ```
 
 ---

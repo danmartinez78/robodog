@@ -17,94 +17,133 @@
             background: #0d0d0d;
             color: #5cb85c;
             min-height: 100vh;
-            padding: 20px;
+            padding: 15px;
             overflow-x: hidden;
         }
 
         .container {
-            max-width: 1600px;
+            max-width: 1400px;
             margin: 0 auto;
         }
 
+        /* Compact Header with Inline Status */
         .header {
-            text-align: center;
+            background: #1a1a1a;
+            border: 1px solid #333;
+            border-radius: 5px;
+            padding: 15px 20px;
+            margin-bottom: 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .header-title {
+            font-size: 1.8em;
+            font-weight: bold;
             color: #5cb85c;
-            margin-bottom: 30px;
-            text-shadow: 0 0 10px rgba(92, 184, 92, 0.5);
+            letter-spacing: 2px;
         }
 
-        .header h1 {
-            font-size: 3em;
-            margin-bottom: 10px;
-            letter-spacing: 3px;
+        .header-status {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            font-size: 0.9em;
         }
 
-        .header p {
-            font-size: 1.2em;
-            opacity: 0.8;
+        .status-item {
+            display: flex;
+            align-items: center;
+            gap: 5px;
         }
 
-        .connection-status {
-            display: inline-block;
-            padding: 5px 15px;
+        .status-badge {
+            padding: 3px 10px;
             border: 1px solid;
             border-radius: 3px;
-            font-size: 0.9em;
+            font-size: 0.85em;
             font-weight: 600;
-            margin-top: 10px;
         }
 
-        .connected {
+        .status-badge.connected {
             border-color: #5cb85c;
             color: #5cb85c;
             background: rgba(92, 184, 92, 0.1);
         }
 
-        .disconnected {
+        .status-badge.disconnected {
             border-color: #d9534f;
             color: #d9534f;
             background: rgba(217, 83, 79, 0.1);
         }
 
-        .grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 20px;
-            margin-bottom: 20px;
-        }
-
-        @media (max-width: 1024px) {
-            .grid {
-                grid-template-columns: 1fr;
-            }
-        }
-
+        /* Collapsible Panel System */
         .panel {
             background: #1a1a1a;
             border: 1px solid #333;
             border-radius: 5px;
-            padding: 20px;
-            box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
-        }
-
-        .panel h2 {
-            color: #5cb85c;
             margin-bottom: 15px;
-            font-size: 1.5em;
-            border-bottom: 1px solid #333;
-            padding-bottom: 10px;
+            overflow: hidden;
         }
 
+        .panel-header {
+            padding: 12px 20px;
+            background: #1a1a1a;
+            border-bottom: 1px solid #333;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            user-select: none;
+        }
+
+        .panel-header:hover {
+            background: #222;
+        }
+
+        .panel-title {
+            color: #5cb85c;
+            font-size: 1.2em;
+            font-weight: bold;
+        }
+
+        .panel-toggle {
+            color: #888;
+            font-size: 1.2em;
+            transition: transform 0.3s;
+        }
+
+        .panel-toggle.collapsed {
+            transform: rotate(-90deg);
+        }
+
+        .panel-content {
+            padding: 15px 20px;
+            max-height: 1000px;
+            transition: max-height 0.3s ease-out, padding 0.3s;
+            overflow: hidden;
+        }
+
+        .panel-content.collapsed {
+            max-height: 0;
+            padding: 0 20px;
+        }
+
+        /* Camera Feed - Reduced Size */
         .video-feed {
             width: 100%;
-            height: 400px;
+            height: 250px;
             background: #000;
             border: 1px solid #333;
+            border-radius: 3px;
             display: flex;
             align-items: center;
             justify-content: center;
             color: #666;
-            font-size: 1.2em;
+            font-size: 1em;
         }
 
         .video-feed img {
@@ -113,54 +152,22 @@
             object-fit: contain;
         }
 
-        .diagnostics-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 15px;
-            margin-top: 15px;
-        }
-
-        .diag-item {
-            background: #0d0d0d;
-            border: 1px solid #333;
-            padding: 15px;
-            border-radius: 3px;
-        }
-
-        .diag-label {
-            color: #888;
-            font-size: 0.9em;
-            margin-bottom: 5px;
-        }
-
-        .diag-value {
-            color: #5cb85c;
-            font-size: 1.2em;
-            font-weight: bold;
-        }
-
-        .diag-value.error {
-            color: #d9534f;
-        }
-
-        .diag-value.warning {
-            color: #f0ad4e;
-        }
-
+        /* Terminal - Reduced Size */
         .terminal {
             background: #000;
             border: 1px solid #333;
             border-radius: 3px;
-            padding: 15px;
-            height: 400px;
+            padding: 12px;
+            height: 300px;
             overflow-y: auto;
             font-family: 'Courier New', monospace;
-            font-size: 0.9em;
+            font-size: 0.85em;
             line-height: 1.4;
+            margin-bottom: 12px;
         }
 
         .terminal::-webkit-scrollbar {
-            width: 10px;
+            width: 8px;
         }
 
         .terminal::-webkit-scrollbar-track {
@@ -169,32 +176,35 @@
 
         .terminal::-webkit-scrollbar-thumb {
             background: #333;
-            border-radius: 5px;
+            border-radius: 4px;
         }
 
         .terminal::-webkit-scrollbar-thumb:hover {
-            background: #444;
+            background: #555;
         }
 
         .terminal-line {
-            color: #5cb85c;
-            margin-bottom: 2px;
+            margin-bottom: 4px;
+            word-wrap: break-word;
         }
 
         .terminal-prompt {
-            color: #888;
+            color: #5cb85c;
+            font-weight: bold;
         }
 
+        /* Command Input */
         .command-input {
             width: 100%;
-            padding: 15px;
+            padding: 12px;
             background: #0d0d0d;
             border: 1px solid #333;
             border-radius: 3px;
             color: #5cb85c;
             font-family: 'Courier New', monospace;
-            font-size: 1.1em;
+            font-size: 1em;
             transition: border-color 0.3s;
+            margin-bottom: 10px;
         }
 
         .command-input:focus {
@@ -203,63 +213,75 @@
             box-shadow: 0 0 10px rgba(92, 184, 92, 0.3);
         }
 
-        .command-input::placeholder {
-            color: #555;
-        }
-
+        /* Buttons */
         .btn {
-            padding: 12px 25px;
-            border: 1px solid;
+            padding: 12px 24px;
+            border: none;
             border-radius: 3px;
+            font-family: 'Courier New', monospace;
             font-size: 1em;
-            font-weight: 600;
+            font-weight: bold;
             cursor: pointer;
             transition: all 0.3s;
-            margin: 5px;
-            background: transparent;
-            font-family: 'Courier New', monospace;
         }
 
         .btn-primary {
-            border-color: #5cb85c;
-            color: #5cb85c;
+            background: #5cb85c;
+            color: #0d0d0d;
+            width: 100%;
         }
 
         .btn-primary:hover {
-            background: #5cb85c;
-            color: #000;
+            background: #4cae4c;
             box-shadow: 0 0 15px rgba(92, 184, 92, 0.5);
         }
 
-        .btn-secondary {
-            border-color: #666;
-            color: #888;
-        }
-
-        .btn-secondary:hover {
-            border-color: #5cb85c;
-            color: #5cb85c;
-        }
-
-        h3 {
-            color: #888;
-            margin: 20px 0 10px 0;
-            font-size: 1.1em;
-        }
-
-        .topic-list {
+        /* Compact Diagnostics */
+        .diag-compact {
             display: flex;
             flex-wrap: wrap;
-            gap: 10px;
+            gap: 15px;
+            padding: 10px 0;
+        }
+
+        .diag-compact-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.9em;
+        }
+
+        .diag-compact-label {
+            color: #888;
+        }
+
+        .diag-compact-value {
+            color: #5cb85c;
+            font-weight: bold;
+        }
+
+        .diag-compact-value.error {
+            color: #d9534f;
+        }
+
+        .diag-compact-value.warning {
+            color: #f0ad4e;
+        }
+
+        /* Topic List - Compact */
+        .topic-compact {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
             margin-top: 10px;
         }
 
         .topic-badge {
             background: #0d0d0d;
             border: 1px solid #333;
-            padding: 5px 12px;
+            padding: 3px 10px;
             border-radius: 3px;
-            font-size: 0.85em;
+            font-size: 0.75em;
             color: #5cb85c;
         }
 
@@ -267,105 +289,176 @@
             color: #d9534f;
             border-color: #d9534f;
         }
+
+        /* Critical Topics - Inline in Header */
+        .critical-topics {
+            display: flex;
+            gap: 10px;
+            font-size: 0.85em;
+        }
+
+        .topic-indicator {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .topic-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #5cb85c;
+        }
+
+        .topic-dot.offline {
+            background: #d9534f;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .header {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+
+            .header-title {
+                font-size: 1.5em;
+            }
+
+            .video-feed {
+                height: 200px;
+            }
+
+            .terminal {
+                height: 250px;
+            }
+        }
+
+        /* Utility */
+        .text-muted {
+            color: #888;
+            font-size: 0.9em;
+        }
+
+        .mt-10 {
+            margin-top: 10px;
+        }
     </style>
 </head>
 
 <body>
     <div class="container">
+        <!-- Compact Header with Inline Performance & Status -->
         <div class="header">
-            <h1>SHADOWHOUND</h1>
-            <p>AUTONOMOUS ROBOT MISSION CONTROL</p>
-            <span id="wsStatus" class="connection-status disconnected">CONNECTING...</span>
+            <div class="header-title">SHADOWHOUND</div>
+            <div class="header-status">
+                <div class="status-item">
+                    <span>⚡</span>
+                    <span id="perfSummary">--</span>
+                </div>
+                <div class="status-item">
+                    <span id="wsStatus" class="status-badge disconnected">CONNECTING</span>
+                </div>
+                <div class="critical-topics" id="criticalTopics">
+                    <!-- Populated by JS -->
+                </div>
+            </div>
         </div>
 
-        <div class="grid">
-            <!-- Camera Feed -->
-            <div class="panel">
-                <h2>📹 CAMERA FEED</h2>
+        <!-- Camera Panel - Collapsible -->
+        <div class="panel">
+            <div class="panel-header" onclick="togglePanel('camera')">
+                <div class="panel-title">📹 CAMERA FEED</div>
+                <div class="panel-toggle" id="toggle-camera">▼</div>
+            </div>
+            <div class="panel-content" id="content-camera">
                 <div class="video-feed" id="cameraFeed">
                     <span>NO FEED AVAILABLE</span>
                 </div>
             </div>
-
-            <!-- Performance Metrics -->
-            <div class="panel">
-                <h2>⚡ PERFORMANCE METRICS</h2>
-                <div class="diagnostics-grid">
-                    <div class="diag-item">
-                        <div class="diag-label">AGENT CALL</div>
-                        <div class="diag-value" id="agentDuration">--</div>
-                    </div>
-                    <div class="diag-item">
-                        <div class="diag-label">OVERHEAD</div>
-                        <div class="diag-value" id="overheadDuration">--</div>
-                    </div>
-                    <div class="diag-item">
-                        <div class="diag-label">TOTAL TIME</div>
-                        <div class="diag-value" id="totalDuration">--</div>
-                    </div>
-                    <div class="diag-item">
-                        <div class="diag-label">COMMANDS</div>
-                        <div class="diag-value" id="commandCount">0</div>
-                    </div>
-                </div>
-                <h3>Averages (Last 50 Commands)</h3>
-                <div class="diagnostics-grid">
-                    <div class="diag-item">
-                        <div class="diag-label">AVG AGENT</div>
-                        <div class="diag-value" id="avgAgentDuration">--</div>
-                    </div>
-                    <div class="diag-item">
-                        <div class="diag-label">AVG TOTAL</div>
-                        <div class="diag-value" id="avgTotalDuration">--</div>
-                    </div>
-                </div>
-            </div>
         </div>
 
-        <div class="grid">
-            <!-- Diagnostics -->
-            <div class="panel">
-                <h2>📊 DIAGNOSTICS</h2>
-                <div class="diagnostics-grid">
-                    <div class="diag-item">
-                        <div class="diag-label">ROBOT MODE</div>
-                        <div class="diag-value" id="robotMode">UNKNOWN</div>
-                    </div>
-                    <div class="diag-item">
-                        <div class="diag-label">TOPICS ONLINE</div>
-                        <div class="diag-value" id="topicsCount">0</div>
-                    </div>
-                    <div class="diag-item">
-                        <div class="diag-label">ACTION SERVERS</div>
-                        <div class="diag-value" id="actionCount">0</div>
-                    </div>
-                    <div class="diag-item">
-                        <div class="diag-label">LAST UPDATE</div>
-                        <div class="diag-value" id="lastUpdate">NEVER</div>
-                    </div>
-                </div>
-                <h3>Available Topics</h3>
-                <div class="topic-list" id="topicList">
-                    <span class="topic-badge unavailable">NO DATA</span>
-                </div>
-            </div>
-        </div>
-
-        <!-- Terminal with integrated command input -->
+        <!-- Terminal Panel - Always Visible -->
         <div class="panel">
-            <h2>TERMINAL</h2>
-            <div class="terminal" id="terminal">
-                <div class="terminal-line">
-                    <span class="terminal-prompt">shadowhound@mission-control:~$</span> Waiting for output...
-                </div>
+            <div class="panel-header">
+                <div class="panel-title">TERMINAL</div>
+                <div class="text-muted">Mission control output</div>
             </div>
-            <div style="margin-top: 15px;">
+            <div class="panel-content" style="padding-bottom: 20px;">
+                <div class="terminal" id="terminal">
+                    <div class="terminal-line">
+                        <span class="terminal-prompt">shadowhound@mission-control:~$</span> Waiting for output...
+                    </div>
+                </div>
                 <input type="text" id="commandInput" class="command-input"
                     placeholder="Enter mission command (e.g., 'stand up and wave hello')"
                     onkeypress="if(event.key === 'Enter') sendCommand()">
                 <button class="btn btn-primary" onclick="sendCommand()">▶️ EXECUTE</button>
             </div>
         </div>
+
+        <!-- Diagnostics Panel - Collapsible, Collapsed by Default -->
+        <div class="panel">
+            <div class="panel-header" onclick="togglePanel('diagnostics')">
+                <div class="panel-title">📊 DIAGNOSTICS</div>
+                <div class="panel-toggle collapsed" id="toggle-diagnostics">▼</div>
+            </div>
+            <div class="panel-content collapsed" id="content-diagnostics">
+                <div class="diag-compact">
+                    <div class="diag-compact-item">
+                        <span class="diag-compact-label">MODE:</span>
+                        <span class="diag-compact-value" id="robotMode">UNKNOWN</span>
+                    </div>
+                    <div class="diag-compact-item">
+                        <span class="diag-compact-label">TOPICS:</span>
+                        <span class="diag-compact-value" id="topicsCount">0</span>
+                    </div>
+                    <div class="diag-compact-item">
+                        <span class="diag-compact-label">ACTIONS:</span>
+                        <span class="diag-compact-value" id="actionCount">0</span>
+                    </div>
+                    <div class="diag-compact-item">
+                        <span class="diag-compact-label">UPDATED:</span>
+                        <span class="diag-compact-value" id="lastUpdate">NEVER</span>
+                    </div>
+                </div>
+                
+                <h3 class="text-muted mt-10">Performance Details</h3>
+                <div class="diag-compact">
+                    <div class="diag-compact-item">
+                        <span class="diag-compact-label">AGENT:</span>
+                        <span class="diag-compact-value" id="agentDuration">--</span>
+                    </div>
+                    <div class="diag-compact-item">
+                        <span class="diag-compact-label">OVERHEAD:</span>
+                        <span class="diag-compact-value" id="overheadDuration">--</span>
+                    </div>
+                    <div class="diag-compact-item">
+                        <span class="diag-compact-label">TOTAL:</span>
+                        <span class="diag-compact-value" id="totalDuration">--</span>
+                    </div>
+                    <div class="diag-compact-item">
+                        <span class="diag-compact-label">COMMANDS:</span>
+                        <span class="diag-compact-value" id="commandCount">0</span>
+                    </div>
+                    <div class="diag-compact-item">
+                        <span class="diag-compact-label">AVG AGENT:</span>
+                        <span class="diag-compact-value" id="avgAgentDuration">--</span>
+                    </div>
+                    <div class="diag-compact-item">
+                        <span class="diag-compact-label">AVG TOTAL:</span>
+                        <span class="diag-compact-value" id="avgTotalDuration">--</span>
+                    </div>
+                </div>
+
+                <h3 class="text-muted mt-10">Available Topics (for debugging - use CLI for full list)</h3>
+                <div class="topic-compact" id="topicList">
+                    <span class="topic-badge unavailable">NO DATA</span>
+                </div>
+                <p class="text-muted mt-10">💡 Tip: For detailed topic diagnostics, use: <code>python3 scripts/diagnostics.py --topics</code></p>
+            </div>
+        </div>
+
     </div>
 
     <script>
@@ -379,6 +472,8 @@
         const actionCount = document.getElementById('actionCount');
         const lastUpdate = document.getElementById('lastUpdate');
         const topicList = document.getElementById('topicList');
+        const perfSummary = document.getElementById('perfSummary');
+        const criticalTopics = document.getElementById('criticalTopics');
 
         // Performance metrics elements
         const agentDuration = document.getElementById('agentDuration');
@@ -388,6 +483,15 @@
         const avgAgentDuration = document.getElementById('avgAgentDuration');
         const avgTotalDuration = document.getElementById('avgTotalDuration');
 
+        // Panel Toggle Function
+        function togglePanel(panelId) {
+            const content = document.getElementById(`content-${panelId}`);
+            const toggle = document.getElementById(`toggle-${panelId}`);
+            
+            content.classList.toggle('collapsed');
+            toggle.classList.toggle('collapsed');
+        }
+
         // WebSocket connection
         function connectWebSocket() {
             const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -396,7 +500,7 @@
             ws.onopen = () => {
                 console.log('WebSocket connected');
                 wsStatusSpan.textContent = 'CONNECTED';
-                wsStatusSpan.className = 'connection-status connected';
+                wsStatusSpan.className = 'status-badge connected';
             };
 
             ws.onmessage = (event) => {
@@ -407,7 +511,7 @@
             ws.onclose = () => {
                 console.log('WebSocket disconnected');
                 wsStatusSpan.textContent = 'DISCONNECTED';
-                wsStatusSpan.className = 'connection-status disconnected';
+                wsStatusSpan.className = 'status-badge disconnected';
                 setTimeout(connectWebSocket, 3000);
             };
 
@@ -425,7 +529,9 @@
                 if (data.available && data.image) {
                     cameraFeed.innerHTML = `<img src="data:image/jpeg;base64,${data.image}" alt="Camera Feed">`;
                 } else {
-                    cameraFeed.innerHTML = '<span>NO FEED AVAILABLE</span>';
+                    if (cameraFeed.querySelector('img')) {
+                        cameraFeed.innerHTML = '<span>FEED LOST</span>';
+                    }
                 }
             } catch (error) {
                 console.error('Camera update error:', error);
@@ -449,11 +555,31 @@
                     lastUpdate.textContent = 'NEVER';
                 }
 
-                // Update topic list
+                // Update critical topics in header
+                const criticalTopicNames = ['camera', 'odom', 'imu'];
+                if (data.topics_available) {
+                    const criticalHtml = criticalTopicNames.map(topic => {
+                        const available = data.topics_available.some(t => t.includes(topic));
+                        const dotClass = available ? '' : ' offline';
+                        return `
+                            <div class="topic-indicator">
+                                <div class="topic-dot${dotClass}"></div>
+                                <span>${topic}</span>
+                            </div>
+                        `;
+                    }).join('');
+                    criticalTopics.innerHTML = criticalHtml;
+                }
+
+                // Update topic list (show only first 20)
                 if (data.topics_available && data.topics_available.length > 0) {
-                    topicList.innerHTML = data.topics_available.map(topic =>
+                    const topicsToShow = data.topics_available.slice(0, 20);
+                    topicList.innerHTML = topicsToShow.map(topic =>
                         `<span class="topic-badge">${topic}</span>`
                     ).join('');
+                    if (data.topics_available.length > 20) {
+                        topicList.innerHTML += `<span class="topic-badge text-muted">... +${data.topics_available.length - 20} more</span>`;
+                    }
                 } else {
                     topicList.innerHTML = '<span class="topic-badge unavailable">NO DATA</span>';
                 }
@@ -488,33 +614,39 @@
                 if (data.latest) {
                     const latest = data.latest;
 
-                    // Update latest timing values
+                    // Update header summary (compact)
+                    perfSummary.textContent = `${latest.agent_duration.toFixed(1)}s agent | ${latest.total_duration.toFixed(1)}s total`;
+
+                    // Update detailed values in diagnostics
                     agentDuration.textContent = `${latest.agent_duration.toFixed(2)}s`;
                     overheadDuration.textContent = `${latest.overhead_duration.toFixed(3)}s`;
                     totalDuration.textContent = `${latest.total_duration.toFixed(2)}s`;
                     commandCount.textContent = latest.command_count;
-
-                    // Update averages
                     avgAgentDuration.textContent = `${latest.avg_agent_duration.toFixed(2)}s`;
                     avgTotalDuration.textContent = `${latest.avg_total_duration.toFixed(2)}s`;
 
-                    // Color code based on performance
-                    // Agent call: <2s = good, 2-4s = warning, >4s = error
+                    // Color code performance summary in header
                     if (latest.agent_duration < 2.0) {
-                        agentDuration.className = 'diag-value';
+                        perfSummary.style.color = '#5cb85c';
                     } else if (latest.agent_duration < 4.0) {
-                        agentDuration.className = 'diag-value warning';
+                        perfSummary.style.color = '#f0ad4e';
                     } else {
-                        agentDuration.className = 'diag-value error';
+                        perfSummary.style.color = '#d9534f';
                     }
 
-                    // Total: <3s = good, 3-5s = warning, >5s = error
-                    if (latest.total_duration < 3.0) {
-                        totalDuration.className = 'diag-value';
-                    } else if (latest.total_duration < 5.0) {
-                        totalDuration.className = 'diag-value warning';
-                    } else {
-                        totalDuration.className = 'diag-value error';
+                    // Color code detailed values
+                    agentDuration.className = 'diag-compact-value';
+                    if (latest.agent_duration >= 4.0) {
+                        agentDuration.className += ' error';
+                    } else if (latest.agent_duration >= 2.0) {
+                        agentDuration.className += ' warning';
+                    }
+
+                    totalDuration.className = 'diag-compact-value';
+                    if (latest.total_duration >= 5.0) {
+                        totalDuration.className += ' error';
+                    } else if (latest.total_duration >= 3.0) {
+                        totalDuration.className += ' warning';
                     }
                 }
             } catch (error) {
@@ -537,7 +669,6 @@
             return div.innerHTML;
         }
 
-        // Send command via REST API
         async function sendCommand() {
             const command = commandInput.value.trim();
             if (!command) {
@@ -580,7 +711,7 @@
         setInterval(updateCamera, 1000);        // 1 FPS camera
         setInterval(updateDiagnostics, 2000);   // 0.5 Hz diagnostics
         setInterval(updateTerminal, 1000);      // 1 Hz terminal
-        setInterval(updatePerformance, 1000);   // 1 Hz performance metrics
+        setInterval(updatePerformance, 1000);   // 1 Hz performance
 
         // Initial updates
         updateCamera();
