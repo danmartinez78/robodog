@@ -2,7 +2,7 @@
 <html>
 
 <head>
-    <title>🐕 ShadowHound Mission Control</title>
+    <title>ShadowHound Mission Control</title>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <style>
@@ -290,7 +290,7 @@
 <body>
     <div class="container">
         <div class="header">
-            <h1>🐕 SHADOWHOUND</h1>
+            <h1>SHADOWHOUND</h1>
             <p>AUTONOMOUS ROBOT MISSION CONTROL</p>
             <span id="wsStatus" class="connection-status disconnected">CONNECTING...</span>
         </div>
@@ -396,16 +396,6 @@
                 placeholder="Enter mission command (e.g., 'stand up and wave hello')"
                 onkeypress="if(event.key === 'Enter') sendCommand()">
             <button class="btn btn-primary" onclick="sendCommand()">▶️ EXECUTE</button>
-
-            <h3>Quick Commands</h3>
-            <div class="quick-commands">
-                <button class="btn btn-secondary" onclick="sendQuick('stand up')">🧍 STAND</button>
-                <button class="btn btn-secondary" onclick="sendQuick('sit down')">🪑 SIT</button>
-                <button class="btn btn-secondary" onclick="sendQuick('wave hello')">👋 WAVE</button>
-                <button class="btn btn-secondary" onclick="sendQuick('perform dance 1')">💃 DANCE</button>
-                <button class="btn btn-secondary" onclick="sendQuick('stretch')">🤸 STRETCH</button>
-                <button class="btn btn-secondary" onclick="sendQuick('balance stand')">⚖️ BALANCE</button>
-            </div>
         </div>
     </div>
 
