@@ -12,6 +12,7 @@ The actual mission execution logic is in MissionExecutor (pure Python).
 
 import rclpy
 from rclpy.node import Node
+from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy, DurabilityPolicy
 from std_msgs.msg import String
 from sensor_msgs.msg import Image
 import os
@@ -95,10 +96,17 @@ class MissionAgentNode(Node):
         )
 
         # Subscribe to camera feed for web UI (using raw image with JPEG encoding)
-        self.camera_sub = self.create_subscription(
-            Image, "/camera/image_raw", self.camera_callback, 10
+        # QoS must match publisher: BEST_EFFORT reliability (sensor data pattern)
+        camera_qos = QoSProfile(
+            reliability=ReliabilityPolicy.BEST_EFFORT,
+            history=HistoryPolicy.KEEP_LAST,
+            depth=5,
+            durability=DurabilityPolicy.VOLATILE
         )
-        self.get_logger().info("📹 Subscribed to /camera/image_raw for web UI feed")
+        self.camera_sub = self.create_subscription(
+            Image, "/camera/image_raw", self.camera_callback, camera_qos
+        )
+        self.get_logger().info("📹 Subscribed to /camera/image_raw (BEST_EFFORT QoS) for web UI feed")
 
         # Create ROS publishers
         self.status_pub = self.create_publisher(String, "mission_status", 10)
