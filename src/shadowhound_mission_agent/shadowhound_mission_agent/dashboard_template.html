@@ -185,16 +185,6 @@
             color: #888;
         }
 
-        .status-box {
-            background: #0d0d0d;
-            border-left: 3px solid #5cb85c;
-            padding: 15px;
-            border-radius: 3px;
-            margin: 15px 0;
-            min-height: 60px;
-            font-size: 1.1em;
-        }
-
         .command-input {
             width: 100%;
             padding: 15px;
@@ -249,13 +239,6 @@
         .btn-secondary:hover {
             border-color: #5cb85c;
             color: #5cb85c;
-        }
-
-        .quick-commands {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-            gap: 10px;
-            margin-top: 20px;
         }
 
         h3 {
@@ -368,40 +351,25 @@
             </div>
         </div>
 
-        <div class="grid">
-            <!-- Terminal -->
-            <div class="panel">
-                <h2>💻 TERMINAL</h2>
-                <div class="terminal" id="terminal">
-                    <div class="terminal-line">
-                        <span class="terminal-prompt">shadowhound@mission-control:~$</span> Waiting for output...
-                    </div>
-                </div>
-            </div>
-
-            <!-- Mission Status -->
-            <div class="panel">
-                <h2>📡 MISSION STATUS</h2>
-                <div class="status-box">
-                    <div id="status">Waiting for commands...</div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Command Center -->
+        <!-- Terminal with integrated command input -->
         <div class="panel">
-            <h2>🎮 COMMAND CENTER</h2>
-            <h3>Custom Command</h3>
-            <input type="text" id="commandInput" class="command-input"
-                placeholder="Enter mission command (e.g., 'stand up and wave hello')"
-                onkeypress="if(event.key === 'Enter') sendCommand()">
-            <button class="btn btn-primary" onclick="sendCommand()">▶️ EXECUTE</button>
+            <h2>TERMINAL</h2>
+            <div class="terminal" id="terminal">
+                <div class="terminal-line">
+                    <span class="terminal-prompt">shadowhound@mission-control:~$</span> Waiting for output...
+                </div>
+            </div>
+            <div style="margin-top: 15px;">
+                <input type="text" id="commandInput" class="command-input"
+                    placeholder="Enter mission command (e.g., 'stand up and wave hello')"
+                    onkeypress="if(event.key === 'Enter') sendCommand()">
+                <button class="btn btn-primary" onclick="sendCommand()">▶️ EXECUTE</button>
+            </div>
         </div>
     </div>
 
     <script>
         let ws;
-        const statusDiv = document.getElementById('status');
         const wsStatusSpan = document.getElementById('wsStatus');
         const commandInput = document.getElementById('commandInput');
         const cameraFeed = document.getElementById('cameraFeed');
@@ -434,7 +402,6 @@
             ws.onmessage = (event) => {
                 console.log('Status update:', event.data);
                 addTerminalLine(event.data);
-                statusDiv.textContent = event.data;
             };
 
             ws.onclose = () => {
@@ -583,7 +550,6 @@
         }
 
         async function sendQuick(command) {
-            statusDiv.textContent = `⏳ Sending: ${command}`;
             addTerminalLine(`> ${command}`);
 
             try {
@@ -597,15 +563,12 @@
                 console.log('Response:', data);
 
                 if (data.success) {
-                    statusDiv.textContent = `✅ ${data.message}`;
                     addTerminalLine(`✅ SUCCESS: ${data.message}`);
                 } else {
-                    statusDiv.textContent = `❌ ${data.message}`;
                     addTerminalLine(`❌ ERROR: ${data.message}`);
                 }
             } catch (error) {
                 console.error('Error sending command:', error);
-                statusDiv.textContent = `❌ Error: ${error.message}`;
                 addTerminalLine(`❌ EXCEPTION: ${error.message}`);
             }
         }
