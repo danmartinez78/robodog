@@ -64,6 +64,10 @@ class MissionAgentNode(Node):
         ollama_base_url = self.get_parameter("ollama_base_url").value
         ollama_model = self.get_parameter("ollama_model").value
 
+        # Store backend config for diagnostics
+        self.agent_backend = agent_backend
+        self.agent_model = ollama_model if agent_backend == "ollama" else openai_model
+
         self.get_logger().info("Configuration:")
         self.get_logger().info(f"  Agent backend: {agent_backend}")
         self.get_logger().info(f"  Use planning: {use_planning}")
@@ -411,6 +415,8 @@ class MissionAgentNode(Node):
             self.web.update_diagnostics(
                 {
                     "robot_mode": "operational",  # TODO: Get actual mode from robot state
+                    "agent_backend": self.agent_backend,
+                    "agent_model": self.agent_model,
                     "topics_available": robot_topics,
                     "action_servers": action_servers,
                 }

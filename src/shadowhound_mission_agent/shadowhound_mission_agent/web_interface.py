@@ -85,6 +85,8 @@ class WebInterface:
         # Diagnostics data
         self.diagnostics = {
             "robot_mode": "unknown",
+            "agent_backend": "unknown",
+            "agent_model": "unknown",
             "topics_available": [],
             "action_servers": [],
             "last_update": None,

@@ -403,6 +403,14 @@
                     <h2>📊 DIAGNOSTICS</h2>
                     <div class="diagnostics-grid">
                         <div class="diag-item">
+                            <div class="diag-label">LLM BACKEND</div>
+                            <div class="diag-value" id="agentBackend">UNKNOWN</div>
+                        </div>
+                        <div class="diag-item">
+                            <div class="diag-label">MODEL</div>
+                            <div class="diag-value" id="agentModel">UNKNOWN</div>
+                        </div>
+                        <div class="diag-item">
                             <div class="diag-label">ROBOT MODE</div>
                             <div class="diag-value" id="robotMode">UNKNOWN</div>
                         </div>
@@ -455,6 +463,8 @@
         const commandInput = document.getElementById('commandInput');
         const cameraFeed = document.getElementById('cameraFeed');
         const terminal = document.getElementById('terminal');
+        const agentBackend = document.getElementById('agentBackend');
+        const agentModel = document.getElementById('agentModel');
         const robotMode = document.getElementById('robotMode');
         const topicsCount = document.getElementById('topicsCount');
         const actionCount = document.getElementById('actionCount');
@@ -526,6 +536,20 @@
             try {
                 const response = await fetch('/api/diagnostics');
                 const data = await response.json();
+
+                // Update backend info (with color coding)
+                const backendText = (data.agent_backend || 'UNKNOWN').toUpperCase();
+                agentBackend.textContent = backendText;
+                // Color code: green for Ollama (fast), yellow for OpenAI (slower)
+                if (data.agent_backend === 'ollama') {
+                    agentBackend.style.color = '#5cb85c';  // Green
+                } else if (data.agent_backend === 'openai') {
+                    agentBackend.style.color = '#f0ad4e';  // Orange/yellow
+                } else {
+                    agentBackend.style.color = '#999';  // Gray for unknown
+                }
+                
+                agentModel.textContent = (data.agent_model || 'UNKNOWN').toUpperCase();
 
                 robotMode.textContent = (data.robot_mode || 'UNKNOWN').toUpperCase();
                 topicsCount.textContent = data.topics_available ? data.topics_available.length : 0;
