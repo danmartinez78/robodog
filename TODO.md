@@ -1,6 +1,6 @@
 # ShadowHound TODO List
 
-**Last Updated**: 2025-10-06
+**Last Updated**: 2025-10-08
 
 ---
 
@@ -130,6 +130,17 @@
 ---
 
 ## ✅ Recently Completed
+
+### 2025-10-08
+- ✅ Fixed camera feed QoS mismatch (BEST_EFFORT vs RELIABLE)
+- ✅ Optimized web UI layout for laptop screens
+  - Camera feed (400x300) on left with fixed aspect ratio
+  - Performance + Diagnostics stacked on right
+  - Everything fits on one screen without scrolling
+- ✅ Added collapsible topics list to save vertical space
+- ✅ Updated command examples (removed abandoned pose skills)
+- ✅ Validated multi-step execution with PlanningAgent
+- ✅ Added comprehensive camera callback debug logging
 
 ### 2025-10-06
 - ✅ Agent refactor: Separate ROS concerns from business logic

@@ -2,9 +2,9 @@
 
 An autonomous mobile robot system that combines ROS2 navigation with LLM/VLM-driven task planning for natural language mission execution on Unitree Go2.
 
-**Status**: 🚀 Phase 1 (Active Development) - Mission agent operational, VLM integration in progress  
-**Latest**: PlanningAgent enabled for multi-step execution, performance metrics in web UI  
-**Branch**: `feature/dimos-integration` (main development), `feature/vlm-integration` (vision skills)
+**Status**: 🚀 Phase 1 (Active Development) - Mission agent operational with camera feed  
+**Latest**: Fixed camera QoS, optimized web UI for laptop screens, multi-step execution working  
+**Branch**: `feature/dimos-integration` (main development, ready to merge)
 
 ---
 
@@ -35,10 +35,12 @@ That's it! The script handles everything:
 Try a mission: "rotate to the right and take a step back" 🤖
 
 **New Features**:
-- 🎯 Multi-step sequential execution (PlanningAgent)
+- 🎯 Multi-step sequential execution (PlanningAgent enabled by default)
 - 📊 Real-time performance metrics in web UI
-- 📹 Live camera feed integration
+- 📹 Live camera feed with BEST_EFFORT QoS (working!)
 - ⏱️ Detailed timing instrumentation
+- 🎨 Optimized UI layout for laptop screens (camera + diagnostics + terminal fit on one screen)
+- 📝 Collapsible topics list to save vertical space
 
 ### 📚 For More Control
 
