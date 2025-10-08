@@ -98,6 +98,7 @@ class MissionAgentNode(Node):
         self.camera_sub = self.create_subscription(
             Image, "/camera/image_raw", self.camera_callback, 10
         )
+        self.get_logger().info("📹 Subscribed to /camera/image_raw for web UI feed")
 
         # Create ROS publishers
         self.status_pub = self.create_publisher(String, "mission_status", 10)
@@ -295,17 +296,17 @@ class MissionAgentNode(Node):
 
         try:
             # Debug: Log that we're receiving camera data
-            if not hasattr(self, '_camera_callback_count'):
+            if not hasattr(self, "_camera_callback_count"):
                 self._camera_callback_count = 0
             self._camera_callback_count += 1
-            
+
             # Log every 50 frames to avoid spam
             if self._camera_callback_count % 50 == 1:
                 self.get_logger().info(
                     f"Camera callback triggered (#{self._camera_callback_count}): "
                     f"{msg.width}x{msg.height}, encoding={msg.encoding}"
                 )
-            
+
             # Convert ROS Image to numpy array
             # Handle different encodings (rgb8, bgr8, mono8)
             if msg.encoding == "rgb8":
@@ -336,7 +337,7 @@ class MissionAgentNode(Node):
 
             # Forward JPEG data to web interface
             self.web.update_camera_frame(jpeg_bytes)
-            
+
             # Debug: Log first successful frame
             if self._camera_callback_count == 1:
                 self.get_logger().info(
