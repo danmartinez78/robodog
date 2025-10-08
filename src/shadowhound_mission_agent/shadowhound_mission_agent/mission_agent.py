@@ -101,12 +101,14 @@ class MissionAgentNode(Node):
             reliability=ReliabilityPolicy.BEST_EFFORT,
             history=HistoryPolicy.KEEP_LAST,
             depth=5,
-            durability=DurabilityPolicy.VOLATILE
+            durability=DurabilityPolicy.VOLATILE,
         )
         self.camera_sub = self.create_subscription(
             Image, "/camera/image_raw", self.camera_callback, camera_qos
         )
-        self.get_logger().info("📹 Subscribed to /camera/image_raw (BEST_EFFORT QoS) for web UI feed")
+        self.get_logger().info(
+            "📹 Subscribed to /camera/image_raw (BEST_EFFORT QoS) for web UI feed"
+        )
 
         # Create ROS publishers
         self.status_pub = self.create_publisher(String, "mission_status", 10)
