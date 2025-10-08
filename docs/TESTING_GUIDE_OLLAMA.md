@@ -8,8 +8,8 @@
 
 ```
 ┌─────────────────────────────────────────────┐
-│ Laptop (daniel@9510)                        │
-│  - Devcontainer with ROS2 + ShadowHound     │
+│ Laptop (daniel@9510) - Native Ubuntu       │
+│  - ROS2 Humble + ShadowHound workspace      │
 │  - Mission agent                            │
 │  - Web UI (http://localhost:8080)           │
 │  - Connects to Thor's Ollama via network    │
@@ -25,7 +25,7 @@
 
 ## Pre-Flight Checklist
 
-### On Laptop Devcontainer (daniel@9510)
+### On Laptop (daniel@9510) - Native Ubuntu
 - [ ] Workspace pulled latest changes
 - [ ] On `feature/local-llm-support` branch
 - [ ] Workspace built (`cb` or colcon build)
@@ -87,7 +87,7 @@ ip addr show | grep "inet " | grep -v 127.0.0.1
 ## Test Connectivity from Laptop
 
 ```bash
-# On laptop devcontainer, test Thor's Ollama
+# On laptop (native Ubuntu), test Thor's Ollama
 # Replace 192.168.1.50 with your Thor's actual IP
 curl http://192.168.1.50:11434/api/tags
 
@@ -105,7 +105,7 @@ curl http://192.168.1.50:11434/api/tags
 ## Test 1: Launch with Ollama Backend
 
 ```bash
-# On laptop devcontainer
+# On laptop (native Ubuntu)
 # Replace 192.168.1.50 with your Thor's actual IP
 
 ros2 launch shadowhound_mission_agent mission_agent.launch.py \
@@ -313,7 +313,7 @@ ssh thor "docker stats ollama --no-stream"
 After testing, note:
 1. Thor specs (AGX Orin, RAM, GPU)
 2. Model used (13B/8B recommended for Thor)
-3. Network setup (laptop devcontainer → Thor container via LAN)
+3. Network setup (laptop native Ubuntu → Thor container via LAN)
 4. Actual response times:
    - Simple command: _____ seconds
    - Multi-step command: _____ seconds

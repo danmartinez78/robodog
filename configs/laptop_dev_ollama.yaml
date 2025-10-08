@@ -1,9 +1,9 @@
 # ShadowHound Configuration: Laptop Development with Thor Ollama
 # 
-# Use this configuration when developing on laptop and using Ollama
-# running on Thor (on desk) for LLM inference.
+# Use this configuration when developing on laptop (native Ubuntu) and using
+# Ollama running on Thor (on desk) for LLM inference.
 #
-# Deployment: Laptop devcontainer -> Thor Ollama container (via network)
+# Deployment: Laptop (daniel@9510) -> Thor Ollama container (via network)
 # Performance: ~1-3s response time (10x faster than cloud, includes network latency)
 #
 # Prerequisites:
