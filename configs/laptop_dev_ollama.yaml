@@ -1,15 +1,15 @@
-# ShadowHound Configuration: Laptop Development with Gaming PC Ollama
+# ShadowHound Configuration: Laptop Development with Thor Ollama
 # 
 # Use this configuration when developing on laptop and using Ollama
-# running on a separate gaming PC for LLM inference.
+# running on Thor (on desk) for LLM inference.
 #
-# Deployment: Laptop devcontainer -> Gaming PC Ollama (via network)
-# Performance: ~0.5-1s response time (24x faster than cloud)
+# Deployment: Laptop devcontainer -> Thor Ollama container (via network)
+# Performance: ~1-3s response time (10x faster than cloud, includes network latency)
 #
 # Prerequisites:
-# 1. Ollama running on gaming PC (port 11434)
-# 2. Gaming PC firewall allows connections from laptop
-# 3. Model downloaded: ollama pull llama3.1:70b
+# 1. Ollama container running on Thor (port 11434)
+# 2. Thor's docker port 11434 exposed to network
+# 3. Model downloaded: docker exec -it ollama ollama pull llama3.1:13b
 #
 # Usage:
 #   ros2 launch shadowhound_bringup shadowhound.launch.py \
@@ -19,9 +19,9 @@
 agent_backend: "ollama"
 use_planning_agent: false
 
-# Ollama settings - REPLACE WITH YOUR GAMING PC IP
-ollama_base_url: "http://192.168.1.100:11434"  # <-- Change this!
-ollama_model: "llama3.1:70b"  # 70B for best quality
+# Ollama settings - REPLACE WITH YOUR THOR'S IP
+ollama_base_url: "http://192.168.1.50:11434"  # <-- Change to Thor's actual IP!
+ollama_model: "llama3.1:13b"  # 13B recommended for Thor (32GB AGX Orin)
 
 # Robot settings
 robot_ip: "192.168.1.103"  # Go2 robot IP
