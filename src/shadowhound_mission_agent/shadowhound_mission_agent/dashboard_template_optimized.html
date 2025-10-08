@@ -1,0 +1,725 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>ShadowHound Mission Control</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Courier New', 'Monaco', monospace;
+            background: #0d0d0d;
+            color: #5cb85c;
+            min-height: 100vh;
+            padding: 15px;
+            overflow-x: hidden;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        /* Compact Header with Inline Status */
+        .header {
+            background: #1a1a1a;
+            border: 1px solid #333;
+            border-radius: 5px;
+            padding: 15px 20px;
+            margin-bottom: 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .header-title {
+            font-size: 1.8em;
+            font-weight: bold;
+            color: #5cb85c;
+            letter-spacing: 2px;
+        }
+
+        .header-status {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            font-size: 0.9em;
+        }
+
+        .status-item {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .status-badge {
+            padding: 3px 10px;
+            border: 1px solid;
+            border-radius: 3px;
+            font-size: 0.85em;
+            font-weight: 600;
+        }
+
+        .status-badge.connected {
+            border-color: #5cb85c;
+            color: #5cb85c;
+            background: rgba(92, 184, 92, 0.1);
+        }
+
+        .status-badge.disconnected {
+            border-color: #d9534f;
+            color: #d9534f;
+            background: rgba(217, 83, 79, 0.1);
+        }
+
+        /* Collapsible Panel System */
+        .panel {
+            background: #1a1a1a;
+            border: 1px solid #333;
+            border-radius: 5px;
+            margin-bottom: 15px;
+            overflow: hidden;
+        }
+
+        .panel-header {
+            padding: 12px 20px;
+            background: #1a1a1a;
+            border-bottom: 1px solid #333;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            user-select: none;
+        }
+
+        .panel-header:hover {
+            background: #222;
+        }
+
+        .panel-title {
+            color: #5cb85c;
+            font-size: 1.2em;
+            font-weight: bold;
+        }
+
+        .panel-toggle {
+            color: #888;
+            font-size: 1.2em;
+            transition: transform 0.3s;
+        }
+
+        .panel-toggle.collapsed {
+            transform: rotate(-90deg);
+        }
+
+        .panel-content {
+            padding: 15px 20px;
+            max-height: 1000px;
+            transition: max-height 0.3s ease-out, padding 0.3s;
+            overflow: hidden;
+        }
+
+        .panel-content.collapsed {
+            max-height: 0;
+            padding: 0 20px;
+        }
+
+        /* Camera Feed - Reduced Size */
+        .video-feed {
+            width: 100%;
+            height: 250px;
+            background: #000;
+            border: 1px solid #333;
+            border-radius: 3px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #666;
+            font-size: 1em;
+        }
+
+        .video-feed img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+
+        /* Terminal - Reduced Size */
+        .terminal {
+            background: #000;
+            border: 1px solid #333;
+            border-radius: 3px;
+            padding: 12px;
+            height: 300px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 0.85em;
+            line-height: 1.4;
+            margin-bottom: 12px;
+        }
+
+        .terminal::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .terminal::-webkit-scrollbar-track {
+            background: #0d0d0d;
+        }
+
+        .terminal::-webkit-scrollbar-thumb {
+            background: #333;
+            border-radius: 4px;
+        }
+
+        .terminal::-webkit-scrollbar-thumb:hover {
+            background: #555;
+        }
+
+        .terminal-line {
+            margin-bottom: 4px;
+            word-wrap: break-word;
+        }
+
+        .terminal-prompt {
+            color: #5cb85c;
+            font-weight: bold;
+        }
+
+        /* Command Input */
+        .command-input {
+            width: 100%;
+            padding: 12px;
+            background: #0d0d0d;
+            border: 1px solid #333;
+            border-radius: 3px;
+            color: #5cb85c;
+            font-family: 'Courier New', monospace;
+            font-size: 1em;
+            transition: border-color 0.3s;
+            margin-bottom: 10px;
+        }
+
+        .command-input:focus {
+            outline: none;
+            border-color: #5cb85c;
+            box-shadow: 0 0 10px rgba(92, 184, 92, 0.3);
+        }
+
+        /* Buttons */
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 3px;
+            font-family: 'Courier New', monospace;
+            font-size: 1em;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn-primary {
+            background: #5cb85c;
+            color: #0d0d0d;
+            width: 100%;
+        }
+
+        .btn-primary:hover {
+            background: #4cae4c;
+            box-shadow: 0 0 15px rgba(92, 184, 92, 0.5);
+        }
+
+        /* Compact Diagnostics */
+        .diag-compact {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            padding: 10px 0;
+        }
+
+        .diag-compact-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.9em;
+        }
+
+        .diag-compact-label {
+            color: #888;
+        }
+
+        .diag-compact-value {
+            color: #5cb85c;
+            font-weight: bold;
+        }
+
+        .diag-compact-value.error {
+            color: #d9534f;
+        }
+
+        .diag-compact-value.warning {
+            color: #f0ad4e;
+        }
+
+        /* Topic List - Compact */
+        .topic-compact {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 10px;
+        }
+
+        .topic-badge {
+            background: #0d0d0d;
+            border: 1px solid #333;
+            padding: 3px 10px;
+            border-radius: 3px;
+            font-size: 0.75em;
+            color: #5cb85c;
+        }
+
+        .topic-badge.unavailable {
+            color: #d9534f;
+            border-color: #d9534f;
+        }
+
+        /* Critical Topics - Inline in Header */
+        .critical-topics {
+            display: flex;
+            gap: 10px;
+            font-size: 0.85em;
+        }
+
+        .topic-indicator {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .topic-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #5cb85c;
+        }
+
+        .topic-dot.offline {
+            background: #d9534f;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .header {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+
+            .header-title {
+                font-size: 1.5em;
+            }
+
+            .video-feed {
+                height: 200px;
+            }
+
+            .terminal {
+                height: 250px;
+            }
+        }
+
+        /* Utility */
+        .text-muted {
+            color: #888;
+            font-size: 0.9em;
+        }
+
+        .mt-10 {
+            margin-top: 10px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <!-- Compact Header with Inline Performance & Status -->
+        <div class="header">
+            <div class="header-title">SHADOWHOUND</div>
+            <div class="header-status">
+                <div class="status-item">
+                    <span>⚡</span>
+                    <span id="perfSummary">--</span>
+                </div>
+                <div class="status-item">
+                    <span id="wsStatus" class="status-badge disconnected">CONNECTING</span>
+                </div>
+                <div class="critical-topics" id="criticalTopics">
+                    <!-- Populated by JS -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Camera Panel - Collapsible -->
+        <div class="panel">
+            <div class="panel-header" onclick="togglePanel('camera')">
+                <div class="panel-title">📹 CAMERA FEED</div>
+                <div class="panel-toggle" id="toggle-camera">▼</div>
+            </div>
+            <div class="panel-content" id="content-camera">
+                <div class="video-feed" id="cameraFeed">
+                    <span>NO FEED AVAILABLE</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Terminal Panel - Always Visible -->
+        <div class="panel">
+            <div class="panel-header">
+                <div class="panel-title">TERMINAL</div>
+                <div class="text-muted">Mission control output</div>
+            </div>
+            <div class="panel-content" style="padding-bottom: 20px;">
+                <div class="terminal" id="terminal">
+                    <div class="terminal-line">
+                        <span class="terminal-prompt">shadowhound@mission-control:~$</span> Waiting for output...
+                    </div>
+                </div>
+                <input type="text" id="commandInput" class="command-input"
+                    placeholder="Enter mission command (e.g., 'stand up and wave hello')"
+                    onkeypress="if(event.key === 'Enter') sendCommand()">
+                <button class="btn btn-primary" onclick="sendCommand()">▶️ EXECUTE</button>
+            </div>
+        </div>
+
+        <!-- Diagnostics Panel - Collapsible, Collapsed by Default -->
+        <div class="panel">
+            <div class="panel-header" onclick="togglePanel('diagnostics')">
+                <div class="panel-title">📊 DIAGNOSTICS</div>
+                <div class="panel-toggle collapsed" id="toggle-diagnostics">▼</div>
+            </div>
+            <div class="panel-content collapsed" id="content-diagnostics">
+                <div class="diag-compact">
+                    <div class="diag-compact-item">
+                        <span class="diag-compact-label">MODE:</span>
+                        <span class="diag-compact-value" id="robotMode">UNKNOWN</span>
+                    </div>
+                    <div class="diag-compact-item">
+                        <span class="diag-compact-label">TOPICS:</span>
+                        <span class="diag-compact-value" id="topicsCount">0</span>
+                    </div>
+                    <div class="diag-compact-item">
+                        <span class="diag-compact-label">ACTIONS:</span>
+                        <span class="diag-compact-value" id="actionCount">0</span>
+                    </div>
+                    <div class="diag-compact-item">
+                        <span class="diag-compact-label">UPDATED:</span>
+                        <span class="diag-compact-value" id="lastUpdate">NEVER</span>
+                    </div>
+                </div>
+
+                <h3 class="text-muted mt-10">Performance Details</h3>
+                <div class="diag-compact">
+                    <div class="diag-compact-item">
+                        <span class="diag-compact-label">AGENT:</span>
+                        <span class="diag-compact-value" id="agentDuration">--</span>
+                    </div>
+                    <div class="diag-compact-item">
+                        <span class="diag-compact-label">OVERHEAD:</span>
+                        <span class="diag-compact-value" id="overheadDuration">--</span>
+                    </div>
+                    <div class="diag-compact-item">
+                        <span class="diag-compact-label">TOTAL:</span>
+                        <span class="diag-compact-value" id="totalDuration">--</span>
+                    </div>
+                    <div class="diag-compact-item">
+                        <span class="diag-compact-label">COMMANDS:</span>
+                        <span class="diag-compact-value" id="commandCount">0</span>
+                    </div>
+                    <div class="diag-compact-item">
+                        <span class="diag-compact-label">AVG AGENT:</span>
+                        <span class="diag-compact-value" id="avgAgentDuration">--</span>
+                    </div>
+                    <div class="diag-compact-item">
+                        <span class="diag-compact-label">AVG TOTAL:</span>
+                        <span class="diag-compact-value" id="avgTotalDuration">--</span>
+                    </div>
+                </div>
+
+                <h3 class="text-muted mt-10">Available Topics (for debugging - use CLI for full list)</h3>
+                <div class="topic-compact" id="topicList">
+                    <span class="topic-badge unavailable">NO DATA</span>
+                </div>
+                <p class="text-muted mt-10">💡 Tip: For detailed topic diagnostics, use:
+                    <code>python3 scripts/diagnostics.py --topics</code></p>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        let ws;
+        const wsStatusSpan = document.getElementById('wsStatus');
+        const commandInput = document.getElementById('commandInput');
+        const cameraFeed = document.getElementById('cameraFeed');
+        const terminal = document.getElementById('terminal');
+        const robotMode = document.getElementById('robotMode');
+        const topicsCount = document.getElementById('topicsCount');
+        const actionCount = document.getElementById('actionCount');
+        const lastUpdate = document.getElementById('lastUpdate');
+        const topicList = document.getElementById('topicList');
+        const perfSummary = document.getElementById('perfSummary');
+        const criticalTopics = document.getElementById('criticalTopics');
+
+        // Performance metrics elements
+        const agentDuration = document.getElementById('agentDuration');
+        const overheadDuration = document.getElementById('overheadDuration');
+        const totalDuration = document.getElementById('totalDuration');
+        const commandCount = document.getElementById('commandCount');
+        const avgAgentDuration = document.getElementById('avgAgentDuration');
+        const avgTotalDuration = document.getElementById('avgTotalDuration');
+
+        // Panel Toggle Function
+        function togglePanel(panelId) {
+            const content = document.getElementById(`content-${panelId}`);
+            const toggle = document.getElementById(`toggle-${panelId}`);
+
+            content.classList.toggle('collapsed');
+            toggle.classList.toggle('collapsed');
+        }
+
+        // WebSocket connection
+        function connectWebSocket() {
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            ws = new WebSocket(`${protocol}//${window.location.host}/ws/status`);
+
+            ws.onopen = () => {
+                console.log('WebSocket connected');
+                wsStatusSpan.textContent = 'CONNECTED';
+                wsStatusSpan.className = 'status-badge connected';
+            };
+
+            ws.onmessage = (event) => {
+                console.log('Status update:', event.data);
+                addTerminalLine(event.data);
+            };
+
+            ws.onclose = () => {
+                console.log('WebSocket disconnected');
+                wsStatusSpan.textContent = 'DISCONNECTED';
+                wsStatusSpan.className = 'status-badge disconnected';
+                setTimeout(connectWebSocket, 3000);
+            };
+
+            ws.onerror = (error) => {
+                console.error('WebSocket error:', error);
+            };
+        }
+
+        // Update camera feed
+        async function updateCamera() {
+            try {
+                const response = await fetch('/api/camera/latest');
+                const data = await response.json();
+
+                if (data.available && data.image) {
+                    cameraFeed.innerHTML = `<img src="data:image/jpeg;base64,${data.image}" alt="Camera Feed">`;
+                } else {
+                    if (cameraFeed.querySelector('img')) {
+                        cameraFeed.innerHTML = '<span>FEED LOST</span>';
+                    }
+                }
+            } catch (error) {
+                console.error('Camera update error:', error);
+            }
+        }
+
+        // Update diagnostics
+        async function updateDiagnostics() {
+            try {
+                const response = await fetch('/api/diagnostics');
+                const data = await response.json();
+
+                robotMode.textContent = (data.robot_mode || 'UNKNOWN').toUpperCase();
+                topicsCount.textContent = data.topics_available ? data.topics_available.length : 0;
+                actionCount.textContent = data.action_servers ? data.action_servers.length : 0;
+
+                if (data.last_update) {
+                    const time = new Date(data.last_update).toLocaleTimeString();
+                    lastUpdate.textContent = time;
+                } else {
+                    lastUpdate.textContent = 'NEVER';
+                }
+
+                // Update critical topics in header
+                const criticalTopicNames = ['camera', 'odom', 'imu'];
+                if (data.topics_available) {
+                    const criticalHtml = criticalTopicNames.map(topic => {
+                        const available = data.topics_available.some(t => t.includes(topic));
+                        const dotClass = available ? '' : ' offline';
+                        return `
+                            <div class="topic-indicator">
+                                <div class="topic-dot${dotClass}"></div>
+                                <span>${topic}</span>
+                            </div>
+                        `;
+                    }).join('');
+                    criticalTopics.innerHTML = criticalHtml;
+                }
+
+                // Update topic list (show only first 20)
+                if (data.topics_available && data.topics_available.length > 0) {
+                    const topicsToShow = data.topics_available.slice(0, 20);
+                    topicList.innerHTML = topicsToShow.map(topic =>
+                        `<span class="topic-badge">${topic}</span>`
+                    ).join('');
+                    if (data.topics_available.length > 20) {
+                        topicList.innerHTML += `<span class="topic-badge text-muted">... +${data.topics_available.length - 20} more</span>`;
+                    }
+                } else {
+                    topicList.innerHTML = '<span class="topic-badge unavailable">NO DATA</span>';
+                }
+            } catch (error) {
+                console.error('Diagnostics update error:', error);
+            }
+        }
+
+        // Update terminal
+        async function updateTerminal() {
+            try {
+                const response = await fetch('/api/terminal');
+                const data = await response.json();
+
+                if (data.lines && data.lines.length > 0) {
+                    terminal.innerHTML = data.lines.map(line =>
+                        `<div class="terminal-line">${escapeHtml(line)}</div>`
+                    ).join('');
+                    terminal.scrollTop = terminal.scrollHeight;
+                }
+            } catch (error) {
+                console.error('Terminal update error:', error);
+            }
+        }
+
+        // Update performance metrics
+        async function updatePerformance() {
+            try {
+                const response = await fetch('/api/performance');
+                const data = await response.json();
+
+                if (data.latest) {
+                    const latest = data.latest;
+
+                    // Update header summary (compact)
+                    perfSummary.textContent = `${latest.agent_duration.toFixed(1)}s agent | ${latest.total_duration.toFixed(1)}s total`;
+
+                    // Update detailed values in diagnostics
+                    agentDuration.textContent = `${latest.agent_duration.toFixed(2)}s`;
+                    overheadDuration.textContent = `${latest.overhead_duration.toFixed(3)}s`;
+                    totalDuration.textContent = `${latest.total_duration.toFixed(2)}s`;
+                    commandCount.textContent = latest.command_count;
+                    avgAgentDuration.textContent = `${latest.avg_agent_duration.toFixed(2)}s`;
+                    avgTotalDuration.textContent = `${latest.avg_total_duration.toFixed(2)}s`;
+
+                    // Color code performance summary in header
+                    if (latest.agent_duration < 2.0) {
+                        perfSummary.style.color = '#5cb85c';
+                    } else if (latest.agent_duration < 4.0) {
+                        perfSummary.style.color = '#f0ad4e';
+                    } else {
+                        perfSummary.style.color = '#d9534f';
+                    }
+
+                    // Color code detailed values
+                    agentDuration.className = 'diag-compact-value';
+                    if (latest.agent_duration >= 4.0) {
+                        agentDuration.className += ' error';
+                    } else if (latest.agent_duration >= 2.0) {
+                        agentDuration.className += ' warning';
+                    }
+
+                    totalDuration.className = 'diag-compact-value';
+                    if (latest.total_duration >= 5.0) {
+                        totalDuration.className += ' error';
+                    } else if (latest.total_duration >= 3.0) {
+                        totalDuration.className += ' warning';
+                    }
+                }
+            } catch (error) {
+                console.error('Performance update error:', error);
+            }
+        }
+
+        function addTerminalLine(text) {
+            const timestamp = new Date().toLocaleTimeString();
+            const line = document.createElement('div');
+            line.className = 'terminal-line';
+            line.innerHTML = `<span class="terminal-prompt">[${timestamp}]</span> ${escapeHtml(text)}`;
+            terminal.appendChild(line);
+            terminal.scrollTop = terminal.scrollHeight;
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        async function sendCommand() {
+            const command = commandInput.value.trim();
+            if (!command) {
+                alert('Please enter a command');
+                return;
+            }
+
+            sendQuick(command);
+            commandInput.value = '';
+        }
+
+        async function sendQuick(command) {
+            addTerminalLine(`> ${command}`);
+
+            try {
+                const response = await fetch('/api/mission', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ command: command })
+                });
+
+                const data = await response.json();
+                console.log('Response:', data);
+
+                if (data.success) {
+                    addTerminalLine(`✅ SUCCESS: ${data.message}`);
+                } else {
+                    addTerminalLine(`❌ ERROR: ${data.message}`);
+                }
+            } catch (error) {
+                console.error('Error sending command:', error);
+                addTerminalLine(`❌ EXCEPTION: ${error.message}`);
+            }
+        }
+
+        // Initialize
+        connectWebSocket();
+
+        // Poll for updates
+        setInterval(updateCamera, 1000);        // 1 FPS camera
+        setInterval(updateDiagnostics, 2000);   // 0.5 Hz diagnostics
+        setInterval(updateTerminal, 1000);      // 1 Hz terminal
+        setInterval(updatePerformance, 1000);   // 1 Hz performance
+
+        // Initial updates
+        updateCamera();
+        updateDiagnostics();
+        updateTerminal();
+        updatePerformance();
+    </script>
+</body>
+
+</html>

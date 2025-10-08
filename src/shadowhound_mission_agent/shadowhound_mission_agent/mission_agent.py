@@ -287,40 +287,64 @@ class MissionAgentNode(Node):
 
     def camera_callback(self, msg: Image):
         """Handle camera feed for web UI.
-        
+
         Converts raw ROS Image message to JPEG format for efficient web streaming.
         """
         if not self.web:
             return
-            
+
         try:
+            # Debug: Log that we're receiving camera data
+            if not hasattr(self, '_camera_callback_count'):
+                self._camera_callback_count = 0
+            self._camera_callback_count += 1
+            
+            # Log every 50 frames to avoid spam
+            if self._camera_callback_count % 50 == 1:
+                self.get_logger().info(
+                    f"Camera callback triggered (#{self._camera_callback_count}): "
+                    f"{msg.width}x{msg.height}, encoding={msg.encoding}"
+                )
+            
             # Convert ROS Image to numpy array
             # Handle different encodings (rgb8, bgr8, mono8)
-            if msg.encoding == 'rgb8':
+            if msg.encoding == "rgb8":
                 # Convert RGB to BGR for OpenCV
-                np_arr = np.frombuffer(msg.data, dtype=np.uint8).reshape(msg.height, msg.width, 3)
+                np_arr = np.frombuffer(msg.data, dtype=np.uint8).reshape(
+                    msg.height, msg.width, 3
+                )
                 cv_image = cv2.cvtColor(np_arr, cv2.COLOR_RGB2BGR)
-            elif msg.encoding == 'bgr8':
+            elif msg.encoding == "bgr8":
                 # Already in BGR format
-                np_arr = np.frombuffer(msg.data, dtype=np.uint8).reshape(msg.height, msg.width, 3)
+                np_arr = np.frombuffer(msg.data, dtype=np.uint8).reshape(
+                    msg.height, msg.width, 3
+                )
                 cv_image = np_arr
-            elif msg.encoding == 'mono8':
+            elif msg.encoding == "mono8":
                 # Grayscale image
-                cv_image = np.frombuffer(msg.data, dtype=np.uint8).reshape(msg.height, msg.width)
+                cv_image = np.frombuffer(msg.data, dtype=np.uint8).reshape(
+                    msg.height, msg.width
+                )
             else:
                 self.get_logger().warn(f"Unsupported image encoding: {msg.encoding}")
                 return
-            
+
             # Encode as JPEG (quality=85 for good balance of size/quality)
             encode_param = [int(cv2.IMWRITE_JPEG_QUALITY), 85]
-            _, jpeg_buffer = cv2.imencode('.jpg', cv_image, encode_param)
+            _, jpeg_buffer = cv2.imencode(".jpg", cv_image, encode_param)
             jpeg_bytes = jpeg_buffer.tobytes()
-            
+
             # Forward JPEG data to web interface
             self.web.update_camera_frame(jpeg_bytes)
             
+            # Debug: Log first successful frame
+            if self._camera_callback_count == 1:
+                self.get_logger().info(
+                    f"✅ First camera frame encoded successfully: {len(jpeg_bytes)} bytes"
+                )
+
         except Exception as e:
-            self.get_logger().error(f"Camera callback error: {e}")
+            self.get_logger().error(f"Camera callback error: {e}", exc_info=True)
 
     def update_diagnostics(self):
         """Update diagnostics information for web UI."""
