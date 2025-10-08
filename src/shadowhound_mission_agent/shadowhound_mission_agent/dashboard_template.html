@@ -107,8 +107,8 @@
         }
 
         .video-feed {
-            width: 480px;
-            height: 360px;
+            width: 400px;
+            height: 300px;
             background: #000;
             border: 1px solid #333;
             display: flex;
@@ -173,7 +173,7 @@
             border: 1px solid #333;
             border-radius: 3px;
             padding: 15px;
-            height: 400px;
+            height: 300px;
             overflow-y: auto;
             font-family: 'Courier New', monospace;
             font-size: 0.9em;
@@ -273,6 +273,26 @@
             flex-wrap: wrap;
             gap: 10px;
             margin-top: 10px;
+            max-height: 120px;
+            overflow-y: auto;
+            padding-right: 5px;
+        }
+
+        .topic-list::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .topic-list::-webkit-scrollbar-track {
+            background: #0d0d0d;
+        }
+
+        .topic-list::-webkit-scrollbar-thumb {
+            background: #333;
+            border-radius: 4px;
+        }
+
+        .topic-list::-webkit-scrollbar-thumb:hover {
+            background: #444;
         }
 
         .topic-badge {
@@ -287,6 +307,40 @@
         .topic-badge.unavailable {
             color: #d9534f;
             border-color: #d9534f;
+        }
+
+        .collapsible-header {
+            cursor: pointer;
+            user-select: none;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 5px 0;
+            margin-top: 20px;
+        }
+
+        .collapsible-header:hover h3 {
+            color: #5cb85c;
+        }
+
+        .collapse-icon {
+            color: #888;
+            font-size: 0.9em;
+            transition: transform 0.3s;
+        }
+
+        .collapse-icon.collapsed {
+            transform: rotate(-90deg);
+        }
+
+        .collapsible-content {
+            max-height: 120px;
+            overflow: hidden;
+            transition: max-height 0.3s ease-out;
+        }
+
+        .collapsible-content.collapsed {
+            max-height: 0;
         }
     </style>
 </head>
@@ -365,9 +419,14 @@
                             <div class="diag-value" id="lastUpdate">NEVER</div>
                         </div>
                     </div>
-                    <h3>Available Topics</h3>
-                    <div class="topic-list" id="topicList">
-                        <span class="topic-badge unavailable">NO DATA</span>
+                    <div class="collapsible-header" onclick="toggleTopics()">
+                        <h3 style="margin: 0;">Available Topics</h3>
+                        <span class="collapse-icon collapsed" id="topicsToggle">▼</span>
+                    </div>
+                    <div class="collapsible-content collapsed" id="topicsContent">
+                        <div class="topic-list" id="topicList">
+                            <span class="topic-badge unavailable">NO DATA</span>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -409,6 +468,14 @@
         const commandCount = document.getElementById('commandCount');
         const avgAgentDuration = document.getElementById('avgAgentDuration');
         const avgTotalDuration = document.getElementById('avgTotalDuration');
+
+        // Toggle function for topics list
+        function toggleTopics() {
+            const content = document.getElementById('topicsContent');
+            const icon = document.getElementById('topicsToggle');
+            content.classList.toggle('collapsed');
+            icon.classList.toggle('collapsed');
+        }
 
         // WebSocket connection
         function connectWebSocket() {
