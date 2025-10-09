@@ -74,7 +74,7 @@ benchmark_prompt() {
     local prompt_name=$2
     local prompt_text=$3
     
-    echo -e "${BLUE}  Testing: $prompt_name${NC}"
+    echo -e "${BLUE}  Testing: $prompt_name${NC}" >&2
     
     # Prepare request
     local request_json=$(cat <<EOF
@@ -108,39 +108,39 @@ EOF
         local prompt_eval_count=$(echo "$response" | jq -r '.prompt_eval_count // 0')
         local prompt_eval_duration=$(echo "$response" | jq -r '.prompt_eval_duration // 0')
         
-        # Calculate tokens per second
-        local tokens_per_sec=0
-        if [ "$eval_duration" -gt 0 ]; then
-            tokens_per_sec=$(echo "scale=2; $eval_count / ($eval_duration / 1000000000)" | bc)
+        # Calculate tokens per second (default to 0 if division fails)
+        local tokens_per_sec="0"
+        if [ "$eval_duration" -gt 0 ] 2>/dev/null; then
+            tokens_per_sec=$(echo "scale=2; $eval_count / ($eval_duration / 1000000000)" | bc 2>/dev/null || echo "0")
         fi
         
-        # Calculate time to first token
-        local ttft=0
-        if [ "$prompt_eval_duration" -gt 0 ]; then
-            ttft=$(echo "scale=3; $prompt_eval_duration / 1000000000" | bc)
+        # Calculate time to first token (default to 0 if division fails)
+        local ttft="0"
+        if [ "$prompt_eval_duration" -gt 0 ] 2>/dev/null; then
+            ttft=$(echo "scale=3; $prompt_eval_duration / 1000000000" | bc 2>/dev/null || echo "0")
         fi
         
-        echo -e "    Duration: ${duration}s | Tokens: $eval_count | Speed: ${tokens_per_sec} tok/s | TTFT: ${ttft}s"
+        echo -e "    Duration: ${duration}s | Tokens: $eval_count | Speed: ${tokens_per_sec} tok/s | TTFT: ${ttft}s" >&2
         
-        # Return JSON result using jq for proper escaping
-        local preview=$(echo "$response_text" | head -c 100 | tr '\n' ' ')
+        # Return JSON result using jq for proper escaping (output to stdout only)
+        local preview=$(echo "$response_text" | head -c 100 | tr '\n' ' ' | tr -d '\r')
         jq -n \
             --arg name "$prompt_name" \
-            --argjson duration "$duration" \
-            --argjson tokens "$eval_count" \
-            --argjson speed "$tokens_per_sec" \
-            --argjson ttft "$ttft" \
+            --arg duration "$duration" \
+            --arg tokens "$eval_count" \
+            --arg speed "$tokens_per_sec" \
+            --arg ttft "$ttft" \
             --arg preview "$preview" \
             '{
                 prompt_name: $name,
-                duration_seconds: $duration,
-                tokens_generated: $tokens,
-                tokens_per_second: $speed,
-                time_to_first_token: $ttft,
+                duration_seconds: ($duration | tonumber),
+                tokens_generated: ($tokens | tonumber),
+                tokens_per_second: ($speed | tonumber),
+                time_to_first_token: ($ttft | tonumber),
                 response_preview: $preview
             }'
     else
-        echo -e "    ${RED}Error: Invalid response${NC}"
+        echo -e "    ${RED}Error: Invalid response${NC}" >&2
         jq -n --arg name "$prompt_name" '{prompt_name: $name, error: "Invalid response"}'
     fi
 }
@@ -157,10 +157,10 @@ get_model_info() {
         local param_size=$(echo "$model_info" | jq -r '.details.parameter_size // "unknown"')
         local family=$(echo "$model_info" | jq -r '.details.family // "unknown"')
         
-        echo "Size: $(format_bytes $size) | Parameters: $param_size | Family: $family"
+        echo "Size: $(format_bytes $size) | Parameters: $param_size | Family: $family" >&2
         echo "$size"  # Return size for JSON
     else
-        echo "unknown"
+        echo "unknown" >&2
         echo "0"
     fi
 }
