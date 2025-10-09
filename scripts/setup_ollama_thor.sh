@@ -21,14 +21,11 @@ CONTAINER_NAME="ollama"
 DATA_DIR="${HOME}/ollama-data"
 OLLAMA_PORT=11434
 
-# Model recommendations based on Thor's 32GB RAM
-# Note: Model naming in Ollama uses format "model:size"
-# Try both llama3.1 and llama3 naming conventions
-PRIMARY_MODEL="llama3.1:13b"
-BACKUP_MODEL="llama3.1:8b"  # Lighter fallback
-# Fallback to llama3 if llama3.1 doesn't exist
-ALT_PRIMARY="llama3:13b"
-ALT_BACKUP="llama3:8b"
+# Model recommendations based on Thor's 128GB RAM
+# NOTE: llama3.1 only exists in 8B, 70B, and 405B sizes (NO 13B variant!)
+# Source: https://ollama.com/library/llama3.1/tags
+PRIMARY_MODEL="llama3.1:70b"    # ~43GB download, ~60-70GB RAM (BEST quality for Thor's 128GB!)
+BACKUP_MODEL="llama3.1:8b"      # ~4.9GB download, ~10-12GB RAM (lighter fallback)
 
 echo -e "${YELLOW}Step 1: Checking prerequisites...${NC}"
 
@@ -135,39 +132,32 @@ if [ $RETRY_COUNT -eq $MAX_RETRIES ]; then
 fi
 
 echo ""
-echo -e "${YELLOW}Step 7: Pulling models...${NC}"
+echo -e "${YELLOW}Step 7: Pulling model...${NC}"
 echo ""
-echo "This will take some time depending on your internet speed:"
-echo "  - llama3.1:13b (~7.4 GB) - Recommended for Thor's 32GB RAM"
-echo "  - llama3.1:8b  (~4.7 GB) - Lighter fallback option"
+echo "Note: llama3.1 comes in 8B, 70B, and 405B sizes."
+echo "With Thor's 128GB RAM, we can run the excellent 70B model!"
+echo "  - 70B model (~43 GB) - Top-tier quality, near GPT-4 level"
+echo "  - 8B model (~4.9 GB) - Faster fallback option"
 echo ""
 
-# Pull primary model
-echo -e "${YELLOW}Pulling $PRIMARY_MODEL (recommended)...${NC}"
-echo "Expected size: ~7.4 GB | RAM usage: ~10-12 GB"
-if ! docker exec "$CONTAINER_NAME" ollama pull "$PRIMARY_MODEL" 2>&1; then
-    echo -e "${YELLOW}Model $PRIMARY_MODEL not found, trying $ALT_PRIMARY...${NC}"
-    PRIMARY_MODEL="$ALT_PRIMARY"
-    if ! docker exec "$CONTAINER_NAME" ollama pull "$PRIMARY_MODEL" 2>&1; then
-        echo -e "${RED}Failed to pull model. Checking available models...${NC}"
-        echo "Trying to list available models:"
-        docker exec "$CONTAINER_NAME" ollama list 2>&1 || true
-        echo ""
-        echo "You can manually pull a model with:"
-        echo "  docker exec ollama ollama pull <model-name>"
-        echo ""
-        echo "Common models: llama3:13b, llama3:8b, llama3.1:13b, llama3.1:8b"
-        echo "Try: docker exec ollama ollama pull llama3:13b"
-    else
-        echo -e "${GREEN}✓ $PRIMARY_MODEL ready${NC}"
-    fi
-else
+# Pull the 70B model
+echo -e "${YELLOW}Pulling $PRIMARY_MODEL...${NC}"
+echo "Expected size: ~43 GB | RAM usage: ~60-70 GB"
+echo "This will take a while on first download (~15-30 min depending on connection)..."
+if docker exec "$CONTAINER_NAME" ollama pull "$PRIMARY_MODEL" 2>&1; then
     echo -e "${GREEN}✓ $PRIMARY_MODEL ready${NC}"
+else
+    echo -e "${RED}Failed to pull $PRIMARY_MODEL${NC}"
+    echo ""
+    echo "Available models can be checked at: https://ollama.com/library/llama3.1/tags"
+    echo "Or run: docker exec ollama ollama list"
+    exit 1
 fi
 
 # Ask about backup model
 echo ""
-read -p "Pull backup model $BACKUP_MODEL? (y/N): " -n 1 -r
+echo -e "${YELLOW}Optional: Pull lighter backup model for faster responses?${NC}"
+read -p "Pull backup model $BACKUP_MODEL (~5GB, faster inference)? (y/N): " -n 1 -r
 echo
 if [[ $REPLY =~ ^[Yy]$ ]]; then
     echo -e "${YELLOW}Pulling $BACKUP_MODEL...${NC}"

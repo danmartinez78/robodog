@@ -1,27 +1,30 @@
 # Ollama Model Recommendations for ShadowHound
 
 **Last Updated**: 2025-10-09  
-**Target Hardware**: NVIDIA Jetson AGX Thor (32GB RAM)
+**Target Hardware**: NVIDIA Jetson AGX Thor (128GB RAM)
 
 ---
 
 ## Model Selection Guide
 
-### Primary Recommendation: **llama3.1:13b**
+> **IMPORTANT**: llama3.1 is only available in **8B, 70B, and 405B** sizes. There is NO 13B variant!  
+> See: https://ollama.com/library/llama3.1/tags
+
+### Primary Recommendation: **llama3.1:70b**
 
 **Why this model:**
-- **Best balance** of performance and quality for Thor's 32GB RAM
-- **13B parameters** - "Goldilocks zone" for Jetson Thor
-- **~10-12 GB RAM** during inference (leaves headroom for ROS + navigation)
-- **Response time**: 1-3 seconds for typical mission commands
-- **Quality**: Excellent instruction following and reasoning
+- **Best model Thor can run** - 128GB RAM is perfect for 70B!
+- **70B parameters** - Near GPT-4 level quality
+- **~60-70 GB RAM** during inference (plenty of headroom for ROS + navigation)
+- **Response time**: 2-5 seconds for typical mission commands
+- **Quality**: Exceptional instruction following, reasoning, and planning
 
-**Download size**: ~7.4 GB  
-**Runtime RAM**: ~10-12 GB  
+**Download size**: ~43 GB  
+**Runtime RAM**: ~60-70 GB  
 **Recommended for**: Primary mission agent operation
 
 ```bash
-docker exec ollama ollama pull llama3.1:13b
+docker exec ollama ollama pull llama3.1:70b
 ```
 
 ---
@@ -31,14 +34,14 @@ docker exec ollama ollama pull llama3.1:13b
 ### Backup: **llama3.1:8b**
 
 **When to use:**
-- Testing with lower resource usage
-- Running alongside heavy perception workloads
 - Faster responses needed (0.5-1.5s typical)
-- Thor RAM is constrained by other processes
+- Running alongside heavy perception workloads
+- Testing/development with quick iteration
+- When you need snappy responses over maximum quality
 
-**Download size**: ~4.7 GB  
-**Runtime RAM**: ~6-8 GB  
-**Trade-off**: Slightly less sophisticated reasoning
+**Download size**: ~4.9 GB  
+**Runtime RAM**: ~10-12 GB  
+**Trade-off**: Lower quality reasoning compared to 70B, but still very capable
 
 ```bash
 docker exec ollama ollama pull llama3.1:8b
@@ -63,16 +66,15 @@ docker exec ollama ollama pull llama3.2:3b
 
 ---
 
-### High-End Option: **llama3.1:70b** ⚠️
+### High-End Option: **llama3.1:405b** ⚠️
 
 **Status**: NOT recommended for Thor
 
 **Why avoid:**
-- Requires **40-45 GB RAM** - exceeds Thor's 32GB
-- Will cause out-of-memory errors
-- Better suited for desktop with 64GB+ RAM
-
-**Alternative**: Use this on gaming PC if available, otherwise stick with 13B
+- Requires **~250+ GB RAM** - exceeds Thor's 128GB
+- Model size: ~243GB just to download
+- Would cause out-of-memory errors
+- Better suited for high-end server with 512GB+ RAM
 
 ---
 
@@ -80,24 +82,33 @@ docker exec ollama ollama pull llama3.2:3b
 
 | Model | Size (GB) | RAM (GB) | Speed | Quality | Thor Compatible |
 |-------|-----------|----------|-------|---------|-----------------|
-| llama3.1:13b | 7.4 | 10-12 | ★★★☆☆ | ★★★★★ | ✅ **Recommended** |
-| llama3.1:8b | 4.7 | 6-8 | ★★★★☆ | ★★★★☆ | ✅ Good backup |
+| llama3.1:70b | 43 | 60-70 | ★★★☆☆ | ★★★★★ | ✅ **Recommended** |
+| llama3.1:8b | 4.9 | 10-12 | ★★★★★ | ★★★★☆ | ✅ Faster backup |
 | llama3.2:3b | 2.0 | 3-4 | ★★★★★ | ★★★☆☆ | ✅ Testing only |
-| llama3.1:70b | 40+ | 40-45 | ★★☆☆☆ | ★★★★★ | ❌ Too large |
+| llama3.1:405b | 243+ | 250+ | ★☆☆☆☆ | ★★★★★ | ❌ Too large |
 
 ---
 
 ## Performance Expectations
 
-### llama3.1:13b on Thor
+### llama3.1:70b on Thor (128GB RAM)
 
 | Task Type | Expected Time | vs OpenAI (gpt-4-turbo) |
 |-----------|---------------|-------------------------|
-| Simple command ("rotate 90 degrees") | 1-3s | **10x faster** (was 12s) |
-| Multi-step plan ("explore the lab") | 2-4s | **6x faster** (was 25s) |
-| Complex reasoning | 3-5s | **5x faster** (was 20s) |
+| Simple command ("rotate 90 degrees") | 2-4s | **5x faster** (was 12s) |
+| Multi-step plan ("explore the lab") | 3-6s | **4x faster** (was 25s) |
+| Complex reasoning | 4-8s | **3x faster** (was 20s) |
 
+**Quality**: Near GPT-4 level - significantly better than 8B model  
 **Network overhead**: +0.1-0.3s (laptop → Thor via LAN)
+
+### llama3.1:8b on Thor (for comparison)
+
+| Task Type | Expected Time | vs 70B Quality |
+|-----------|---------------|----------------|
+| Simple command | 0.5-1.5s | Good enough |
+| Multi-step plan | 1-3s | Noticeably simpler |
+| Complex reasoning | 2-4s | May miss nuance |
 
 ---
 
@@ -238,21 +249,22 @@ docker exec ollama nvidia-smi
 
 ## Recommended Setup
 
-For **ShadowHound development**, pull both models:
+For **ShadowHound development** with Thor's 128GB RAM:
 
 ```bash
-# Primary for production
-docker exec ollama ollama pull llama3.1:13b
+# Primary for production - BEST quality
+docker exec ollama ollama pull llama3.1:70b
 
-# Backup for testing/light workloads
+# Backup for fast iteration during development
 docker exec ollama ollama pull llama3.1:8b
 ```
 
 This gives you **flexibility** to switch based on needs:
-- **13B**: Best quality for actual missions
-- **8B**: Faster iteration during development
+- **70B**: Best quality for actual missions, complex planning, near GPT-4 performance
+- **8B**: Faster responses during development/testing
 
-**Total disk**: ~12 GB (acceptable on Thor)
+**Total disk**: ~48 GB (totally fine on Thor)  
+**Peak RAM**: ~70 GB when running 70B (still leaves ~58GB free for ROS/Nav/Perception)
 
 ---
 
