@@ -77,16 +77,16 @@ echo -e "${GREEN}✓ Image pulled${NC}"
 echo ""
 echo -e "${YELLOW}Step 5: Starting Ollama container...${NC}"
 
-# The NVIDIA Jetson image's entrypoint exits after starting the server
-# We need to override with a command that keeps running
+# The image needs a TTY to keep running (similar to -it flag)
+# Use --tty flag with detached mode
 docker run -d \
   --name "$CONTAINER_NAME" \
   --gpus all \
+  --tty \
   -p ${OLLAMA_PORT}:11434 \
   -v "${DATA_DIR}:/data" \
   --restart unless-stopped \
-  "$OLLAMA_IMAGE" \
-  /bin/bash -c "/start_ollama.sh && tail -f /dev/null"
+  "$OLLAMA_IMAGE"
 
 CONTAINER_ID=$(docker ps -lq)
 echo -e "${GREEN}✓ Container started: $CONTAINER_ID${NC}"
