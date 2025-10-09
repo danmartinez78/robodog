@@ -22,9 +22,13 @@ DATA_DIR="${HOME}/ollama-data"
 OLLAMA_PORT=11434
 
 # Model recommendations based on Thor's 32GB RAM
-# We'll pull llama3.1:13b as the primary model
+# Note: Model naming in Ollama uses format "model:size"
+# Try both llama3.1 and llama3 naming conventions
 PRIMARY_MODEL="llama3.1:13b"
 BACKUP_MODEL="llama3.1:8b"  # Lighter fallback
+# Fallback to llama3 if llama3.1 doesn't exist
+ALT_PRIMARY="llama3:13b"
+ALT_BACKUP="llama3:8b"
 
 echo -e "${YELLOW}Step 1: Checking prerequisites...${NC}"
 
@@ -141,8 +145,25 @@ echo ""
 # Pull primary model
 echo -e "${YELLOW}Pulling $PRIMARY_MODEL (recommended)...${NC}"
 echo "Expected size: ~7.4 GB | RAM usage: ~10-12 GB"
-docker exec "$CONTAINER_NAME" ollama pull "$PRIMARY_MODEL"
-echo -e "${GREEN}✓ $PRIMARY_MODEL ready${NC}"
+if ! docker exec "$CONTAINER_NAME" ollama pull "$PRIMARY_MODEL" 2>&1; then
+    echo -e "${YELLOW}Model $PRIMARY_MODEL not found, trying $ALT_PRIMARY...${NC}"
+    PRIMARY_MODEL="$ALT_PRIMARY"
+    if ! docker exec "$CONTAINER_NAME" ollama pull "$PRIMARY_MODEL" 2>&1; then
+        echo -e "${RED}Failed to pull model. Checking available models...${NC}"
+        echo "Trying to list available models:"
+        docker exec "$CONTAINER_NAME" ollama list 2>&1 || true
+        echo ""
+        echo "You can manually pull a model with:"
+        echo "  docker exec ollama ollama pull <model-name>"
+        echo ""
+        echo "Common models: llama3:13b, llama3:8b, llama3.1:13b, llama3.1:8b"
+        echo "Try: docker exec ollama ollama pull llama3:13b"
+    else
+        echo -e "${GREEN}✓ $PRIMARY_MODEL ready${NC}"
+    fi
+else
+    echo -e "${GREEN}✓ $PRIMARY_MODEL ready${NC}"
+fi
 
 # Ask about backup model
 echo ""
