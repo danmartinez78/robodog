@@ -77,17 +77,14 @@ echo -e "${GREEN}✓ Image pulled${NC}"
 echo ""
 echo -e "${YELLOW}Step 5: Starting Ollama container...${NC}"
 
-# Note: This NVIDIA Jetson image may need different configuration
-# Try starting with explicit serve command
+# Start Ollama - the image has its own entrypoint, don't override it
 docker run -d \
   --name "$CONTAINER_NAME" \
   --gpus all \
   -p ${OLLAMA_PORT}:${OLLAMA_PORT} \
   -v "${DATA_DIR}:/data" \
-  -e OLLAMA_HOST=0.0.0.0:${OLLAMA_PORT} \
   --restart unless-stopped \
-  "$OLLAMA_IMAGE" \
-  serve
+  "$OLLAMA_IMAGE"
 
 CONTAINER_ID=$(docker ps -lq)
 echo -e "${GREEN}✓ Container started: $CONTAINER_ID${NC}"
@@ -96,28 +93,14 @@ echo -e "${GREEN}✓ Container started: $CONTAINER_ID${NC}"
 echo ""
 echo -e "${YELLOW}Step 6: Waiting for Ollama to start...${NC}"
 echo "Checking container status..."
-sleep 3
+sleep 5
 
-# First check if container is still running
+# Check if container is still running
 if ! docker ps | grep -q "$CONTAINER_NAME"; then
-    echo -e "${RED}Error: Container exited immediately${NC}"
+    echo -e "${RED}Error: Container exited${NC}"
     echo "Container logs:"
     docker logs "$CONTAINER_NAME"
-    echo ""
-    echo "Trying alternative startup method..."
-    docker rm -f "$CONTAINER_NAME" 2>/dev/null || true
-    
-    # Try without explicit serve command (use default entrypoint)
-    docker run -d \
-      --name "$CONTAINER_NAME" \
-      --gpus all \
-      -p ${OLLAMA_PORT}:${OLLAMA_PORT} \
-      -v "${DATA_DIR}:/data" \
-      -e OLLAMA_HOST=0.0.0.0:${OLLAMA_PORT} \
-      --restart unless-stopped \
-      "$OLLAMA_IMAGE"
-    
-    sleep 5
+    exit 1
 fi
 
 # Check if Ollama API is responding
@@ -125,18 +108,6 @@ MAX_RETRIES=30
 RETRY_COUNT=0
 echo -n "Waiting for API"
 while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
-    # Check if container is still running
-    if ! docker ps | grep -q "$CONTAINER_NAME"; then
-        echo ""
-        echo -e "${RED}Error: Container stopped running${NC}"
-        echo "Last 20 lines of logs:"
-        docker logs --tail 20 "$CONTAINER_NAME"
-        echo ""
-        echo -e "${YELLOW}Run ./scripts/diagnose_ollama_thor.sh for detailed diagnostics${NC}"
-        exit 1
-    fi
-    
-    # Try to connect to API
     if curl -s --max-time 2 http://localhost:${OLLAMA_PORT}/api/tags > /dev/null 2>&1; then
         echo ""
         echo -e "${GREEN}✓ Ollama is ready!${NC}"
@@ -149,16 +120,8 @@ done
 
 if [ $RETRY_COUNT -eq $MAX_RETRIES ]; then
     echo ""
-    echo -e "${RED}Error: Ollama API not responding after 60 seconds${NC}"
-    echo "Container appears to be running but API is not accessible."
-    echo ""
-    echo "Container status:"
-    docker ps | grep "$CONTAINER_NAME"
-    echo ""
-    echo "Recent logs:"
+    echo -e "${RED}Error: Ollama API not responding${NC}"
     docker logs --tail 20 "$CONTAINER_NAME"
-    echo ""
-    echo -e "${YELLOW}Run ./scripts/diagnose_ollama_thor.sh for detailed diagnostics${NC}"
     exit 1
 fi
 
