@@ -5,6 +5,7 @@
     <title>ShadowHound Mission Control</title>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="/static/terminal.css">
     <style>
         * {
             margin: 0;
@@ -432,29 +433,26 @@
             </div>
         </div>
 
-        <!-- Terminal with integrated command input -->
-        <div class="panel">
+        <!-- Terminal with xterm.js -->
+        <div class="panel terminal-panel">
             <h2>TERMINAL</h2>
-            <div class="terminal" id="terminal">
-                <div class="terminal-line">
-                    <span class="terminal-prompt">shadowhound@mission-control:~$</span> Waiting for output...
+            <div class="terminal-toolbar">
+                <span id="terminalStatus" class="terminal-status is-disconnected">DISCONNECTED</span>
+                <div class="terminal-shortcuts">
+                    <span><span class="kbd">↑</span>/<span class="kbd">↓</span> History</span>
+                    <span><span class="kbd">Tab</span> Complete</span>
+                    <span><span class="kbd">Ctrl</span><span class="kbd">L</span> Clear</span>
+                    <span><span class="kbd">Ctrl</span><span class="kbd">C</span> Interrupt</span>
                 </div>
             </div>
-            <div style="margin-top: 15px;">
-                <input type="text" id="commandInput" class="command-input"
-                    placeholder="Enter mission command (e.g., 'go forward 2 meters', 'rotate left 90 degrees')"
-                    onkeypress="if(event.key === 'Enter') sendCommand()">
-                <button class="btn btn-primary" onclick="sendCommand()">▶️ EXECUTE</button>
-            </div>
+            <div id="terminalMount"></div>
         </div>
     </div>
 
     <script>
         let ws;
         const wsStatusSpan = document.getElementById('wsStatus');
-        const commandInput = document.getElementById('commandInput');
         const cameraFeed = document.getElementById('cameraFeed');
-        const terminal = document.getElementById('terminal');
         const robotMode = document.getElementById('robotMode');
         const topicsCount = document.getElementById('topicsCount');
         const actionCount = document.getElementById('actionCount');
@@ -551,23 +549,6 @@
             }
         }
 
-        // Update terminal
-        async function updateTerminal() {
-            try {
-                const response = await fetch('/api/terminal');
-                const data = await response.json();
-
-                if (data.lines && data.lines.length > 0) {
-                    terminal.innerHTML = data.lines.map(line =>
-                        `<div class="terminal-line">${escapeHtml(line)}</div>`
-                    ).join('');
-                    terminal.scrollTop = terminal.scrollHeight;
-                }
-            } catch (error) {
-                console.error('Terminal update error:', error);
-            }
-        }
-
         // Update performance metrics
         async function updatePerformance() {
             try {
@@ -611,54 +592,11 @@
             }
         }
 
-        function addTerminalLine(text) {
-            const timestamp = new Date().toLocaleTimeString();
-            const line = document.createElement('div');
-            line.className = 'terminal-line';
-            line.innerHTML = `<span class="terminal-prompt">[${timestamp}]</span> ${escapeHtml(text)}`;
-            terminal.appendChild(line);
-            terminal.scrollTop = terminal.scrollHeight;
-        }
-
-        function escapeHtml(text) {
-            const div = document.createElement('div');
-            div.textContent = text;
-            return div.innerHTML;
-        }
-
-        // Send command via REST API
-        async function sendCommand() {
-            const command = commandInput.value.trim();
-            if (!command) {
-                alert('Please enter a command');
-                return;
-            }
-
-            sendQuick(command);
-            commandInput.value = '';
-        }
-
-        async function sendQuick(command) {
-            addTerminalLine(`> ${command}`);
-
-            try {
-                const response = await fetch('/api/mission', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ command: command })
-                });
-
-                const data = await response.json();
-                console.log('Response:', data);
-
-                if (data.success) {
-                    addTerminalLine(`✅ SUCCESS: ${data.message}`);
-                } else {
-                    addTerminalLine(`❌ ERROR: ${data.message}`);
-                }
-            } catch (error) {
-                console.error('Error sending command:', error);
-                addTerminalLine(`❌ EXCEPTION: ${error.message}`);
+        function addTerminalLine(text, type = 'info') {
+            if (window.shadowhoundTerminal) {
+                window.shadowhoundTerminal.printResponse({ type, message: text });
+            } else {
+                console.log(`[terminal:${type}]`, text);
             }
         }
 
@@ -668,14 +606,46 @@
         // Poll for updates
         setInterval(updateCamera, 1000);        // 1 FPS camera
         setInterval(updateDiagnostics, 2000);   // 0.5 Hz diagnostics
-        setInterval(updateTerminal, 1000);      // 1 Hz terminal
         setInterval(updatePerformance, 1000);   // 1 Hz performance metrics
 
         // Initial updates
         updateCamera();
         updateDiagnostics();
-        updateTerminal();
         updatePerformance();
+    </script>
+    <script type="module">
+        import TerminalManager, { DEFAULT_COMMANDS } from '/static/terminal.js';
+
+        const terminalMount = document.getElementById('terminalMount');
+        const terminalStatus = document.getElementById('terminalStatus');
+
+        const terminalManager = new TerminalManager({
+            container: terminalMount,
+            statusIndicator: terminalStatus,
+            prompt: 'shadowhound@mission-control:~$ ',
+            autocompleteCommands: Array.from(new Set([
+                ...DEFAULT_COMMANDS,
+                'mission.resume',
+                'mission.pause',
+                'log.tail'
+            ])),
+            builtInCommands: {
+                'mission.resume': {
+                    type: 'info',
+                    message: 'Mission resume command acknowledged (placeholder)'
+                },
+                'mission.pause': {
+                    type: 'info',
+                    message: 'Mission pause command acknowledged (placeholder)'
+                },
+                'log.tail': {
+                    type: 'info',
+                    message: 'Streaming latest mission logs... (placeholder)'
+                }
+            }
+        });
+
+        window.shadowhoundTerminal = terminalManager;
     </script>
 </body>
 

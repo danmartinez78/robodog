@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>ShadowHound Terminal Demo</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="../../src/shadowhound_mission_agent/shadowhound_mission_agent/static/terminal.css">
+  <style>
+    body {
+      font-family: 'Fira Code', 'Courier New', monospace;
+      background: #050505;
+      color: #d0d0d0;
+      margin: 0;
+      padding: 40px 20px;
+      display: flex;
+      justify-content: center;
+    }
+
+    main {
+      width: min(960px, 100%);
+    }
+
+    h1 {
+      color: #5cb85c;
+      letter-spacing: 0.08em;
+      margin-bottom: 8px;
+    }
+
+    p.lead {
+      color: #888;
+      margin-bottom: 24px;
+    }
+
+    .panel {
+      background: #0c0c0c;
+      border: 1px solid #1f1f1f;
+      border-radius: 8px;
+      padding: 24px;
+      box-shadow: 0 0 32px rgba(0, 0, 0, 0.45);
+    }
+
+    .terminal-panel {
+      margin-top: 24px;
+    }
+
+    .hint {
+      margin-top: 18px;
+      color: #aaa;
+      font-size: 0.85rem;
+      line-height: 1.5;
+    }
+
+    a {
+      color: #5cb85c;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <h1>ShadowHound Terminal Demo</h1>
+      <p class="lead">Try the mission terminal component without a backend. Commands are intercepted by a mock WebSocket.</p>
+    </header>
+
+    <section class="panel terminal-panel">
+      <div class="terminal-toolbar">
+        <span id="terminalStatus" class="terminal-status is-disconnected">DISCONNECTED</span>
+        <div class="terminal-shortcuts">
+          <span><span class="kbd">↑</span>/<span class="kbd">↓</span> History</span>
+          <span><span class="kbd">Tab</span> Complete</span>
+          <span><span class="kbd">Ctrl</span><span class="kbd">L</span> Clear</span>
+          <span><span class="kbd">Ctrl</span><span class="kbd">C</span> Interrupt</span>
+        </div>
+      </div>
+      <div id="terminalMount"></div>
+    </section>
+
+    <p class="hint">
+      Available mock commands: <code>skills</code>, <code>status</code>, <code>nodes</code>, <code>topics</code>, <code>map</code>,
+      <code>battery</code>, <code>uptime</code>, <code>teleop</code>, <code>stop</code>, <code>cancel</code>, <code>help</code>, <code>clear</code>,
+      <code>mission.resume</code>, <code>mission.pause</code>, <code>log.tail</code>, <code>ping</code>.
+    </p>
+  </main>
+
+  <script type="module">
+    import TerminalManager, { DEFAULT_COMMANDS } from '../../src/shadowhound_mission_agent/shadowhound_mission_agent/static/terminal.js';
+
+    class MockSocket extends EventTarget {
+      constructor() {
+        super();
+        this.readyState = WebSocket.CONNECTING;
+        setTimeout(() => {
+          this.readyState = WebSocket.OPEN;
+          this.dispatchEvent(new Event('open'));
+        }, 200);
+      }
+
+      send(message) {
+        let parsed;
+        try {
+          parsed = JSON.parse(message);
+        } catch (error) {
+          parsed = { command: message };
+        }
+
+        const command = (parsed.command || '').trim();
+        const catalog = {
+          ping: { type: 'info', message: 'pong (mock socket)' },
+          'log.tail': {
+            type: 'info',
+            message: [
+              '--- recent mission log (mock) ---',
+              '10:41:03 mission_agent ▸ dispatched nav.goto "charging_station"',
+              '10:41:08 nav2 ▸ goal accepted',
+              '10:41:19 perception ▸ doors clear'
+            ]
+          }
+        };
+
+        const response = catalog[command] ?? {
+          type: 'error',
+          message: `Mock backend does not recognise "${command}"`
+        };
+
+        setTimeout(() => {
+          if (this.readyState !== WebSocket.OPEN) {
+            return;
+          }
+          this.dispatchEvent(new MessageEvent('message', { data: JSON.stringify(response) }));
+        }, 300);
+      }
+
+      close() {
+        if (this.readyState === WebSocket.CLOSED) {
+          return;
+        }
+        this.readyState = WebSocket.CLOSED;
+        this.dispatchEvent(new Event('close'));
+      }
+    }
+
+    const terminalManager = new TerminalManager({
+      container: document.getElementById('terminalMount'),
+      statusIndicator: document.getElementById('terminalStatus'),
+      prompt: 'shadowhound@demo:~$ ',
+      websocketUrl: 'mock://terminal',
+      socketFactory: () => new MockSocket(),
+      autocompleteCommands: Array.from(new Set([...DEFAULT_COMMANDS, 'mission.resume', 'mission.pause', 'log.tail', 'ping'])),
+      builtInCommands: {
+        'mission.resume': { type: 'info', message: 'Mission resume acknowledged (demo)' },
+        'mission.pause': { type: 'info', message: 'Mission pause acknowledged (demo)' },
+        'log.tail': { type: 'info', message: 'Use the WebSocket stub by typing log.tail again.' }
+      },
+      onCommand: (command, terminal) => {
+        if (command === 'ping') {
+          terminal.printResponse({ type: 'info', message: 'pong (handled locally)' });
+          return true;
+        }
+        return false;
+      },
+      autoConnect: false
+    });
+
+    terminalManager.printSystem('Launching mock WebSocket...');
+    terminalManager.connect();
+
+    window.demoTerminal = terminalManager;
+  </script>
+</body>
+</html>
