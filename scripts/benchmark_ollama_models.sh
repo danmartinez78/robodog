@@ -122,20 +122,26 @@ EOF
         
         echo -e "    Duration: ${duration}s | Tokens: $eval_count | Speed: ${tokens_per_sec} tok/s | TTFT: ${ttft}s"
         
-        # Return JSON result
-        cat <<EOF
-{
-  "prompt_name": "$prompt_name",
-  "duration_seconds": $duration,
-  "tokens_generated": $eval_count,
-  "tokens_per_second": $tokens_per_sec,
-  "time_to_first_token": $ttft,
-  "response_preview": "$(echo "$response_text" | head -c 100 | tr '\n' ' ')"
-}
-EOF
+        # Return JSON result using jq for proper escaping
+        local preview=$(echo "$response_text" | head -c 100 | tr '\n' ' ')
+        jq -n \
+            --arg name "$prompt_name" \
+            --argjson duration "$duration" \
+            --argjson tokens "$eval_count" \
+            --argjson speed "$tokens_per_sec" \
+            --argjson ttft "$ttft" \
+            --arg preview "$preview" \
+            '{
+                prompt_name: $name,
+                duration_seconds: $duration,
+                tokens_generated: $tokens,
+                tokens_per_second: $speed,
+                time_to_first_token: $ttft,
+                response_preview: $preview
+            }'
     else
         echo -e "    ${RED}Error: Invalid response${NC}"
-        echo "{\"prompt_name\": \"$prompt_name\", \"error\": \"Invalid response\"}"
+        jq -n --arg name "$prompt_name" '{prompt_name: $name, error: "Invalid response"}'
     fi
 }
 
@@ -163,9 +169,9 @@ get_model_info() {
 echo -e "${YELLOW}Starting benchmark...${NC}"
 echo ""
 
-# Initialize results JSON
-echo "[" > "$RESULTS_DIR/$RESULTS_FILE"
-first_model=true
+# Create temp directory for test results
+TEMP_DIR=$(mktemp -d)
+trap "rm -rf $TEMP_DIR" EXIT
 
 for model in "${MODELS[@]}"; do
     echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
@@ -198,42 +204,32 @@ for model in "${MODELS[@]}"; do
     echo -e "${GREEN}✓ Model loaded${NC}"
     echo ""
     
-    # Add model entry to results (comma separator for JSON array)
-    if [ "$first_model" = false ]; then
-        echo "," >> "$RESULTS_DIR/$RESULTS_FILE"
-    fi
-    first_model=false
+    # Create file for this model's results
+    model_file="$TEMP_DIR/$(echo $model | tr ':/' '__').json"
     
-    echo "  {" >> "$RESULTS_DIR/$RESULTS_FILE"
-    echo "    \"model\": \"$model\"," >> "$RESULTS_DIR/$RESULTS_FILE"
-    echo "    \"timestamp\": \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"," >> "$RESULTS_DIR/$RESULTS_FILE"
-    echo "    \"model_size_bytes\": $model_size," >> "$RESULTS_DIR/$RESULTS_FILE"
-    echo "    \"tests\": [" >> "$RESULTS_DIR/$RESULTS_FILE"
+    # Write model metadata
+    jq -n \
+        --arg model "$model" \
+        --arg timestamp "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+        --argjson size "$model_size" \
+        '{model: $model, timestamp: $timestamp, model_size_bytes: $size, tests: []}' > "$model_file"
     
-    # Run tests for each prompt
-    first_test=true
+    # Run tests for each prompt and collect results
     for prompt_name in "${!TEST_PROMPTS[@]}"; do
         prompt_text="${TEST_PROMPTS[$prompt_name]}"
         
-        if [ "$first_test" = false ]; then
-            echo "," >> "$RESULTS_DIR/$RESULTS_FILE"
-        fi
-        first_test=false
-        
         result=$(benchmark_prompt "$model" "$prompt_name" "$prompt_text")
-        echo "      $result" >> "$RESULTS_DIR/$RESULTS_FILE"
+        
+        # Add result to model's tests array
+        jq --argjson test "$result" '.tests += [$test]' "$model_file" > "$model_file.tmp" && mv "$model_file.tmp" "$model_file"
     done
-    
-    echo "" >> "$RESULTS_DIR/$RESULTS_FILE"
-    echo "    ]" >> "$RESULTS_DIR/$RESULTS_FILE"
-    echo -n "  }" >> "$RESULTS_DIR/$RESULTS_FILE"
     
     echo ""
 done
 
-# Close JSON array
-echo "" >> "$RESULTS_DIR/$RESULTS_FILE"
-echo "]" >> "$RESULTS_DIR/$RESULTS_FILE"
+# Combine all model results into final JSON array
+echo -e "${BLUE}Combining results...${NC}"
+jq -s '.' $TEMP_DIR/*.json > "$RESULTS_DIR/$RESULTS_FILE" 2>/dev/null || echo "[]" > "$RESULTS_DIR/$RESULTS_FILE"
 
 echo ""
 echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
