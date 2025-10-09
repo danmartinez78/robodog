@@ -77,21 +77,22 @@ echo -e "${GREEN}✓ Image pulled${NC}"
 echo ""
 echo -e "${YELLOW}Step 5: Starting Ollama container...${NC}"
 
-# Start Ollama in detached mode
-# Note: This NVIDIA image may need specific environment or may have issues running detached
+# The NVIDIA Jetson image's entrypoint exits after starting the server
+# We need to override with a command that keeps running
 docker run -d \
   --name "$CONTAINER_NAME" \
   --gpus all \
   -p ${OLLAMA_PORT}:11434 \
   -v "${DATA_DIR}:/data" \
   --restart unless-stopped \
-  "$OLLAMA_IMAGE"
+  "$OLLAMA_IMAGE" \
+  /bin/bash -c "/start_ollama.sh && tail -f /dev/null"
 
 CONTAINER_ID=$(docker ps -lq)
 echo -e "${GREEN}✓ Container started: $CONTAINER_ID${NC}"
 
-# Give container a moment to initialize
-sleep 3
+# Give server time to start
+sleep 10
 
 # Wait for Ollama to be ready
 echo ""
