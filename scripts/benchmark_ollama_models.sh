@@ -122,6 +122,20 @@ EOF
         
         echo -e "    Duration: ${duration}s | Tokens: $eval_count | Speed: ${tokens_per_sec} tok/s | TTFT: ${ttft}s" >&2
         
+        # Calculate quality score (if Python available)
+        local quality_score="null"
+        local quality_details="null"
+        if command -v python3 &> /dev/null; then
+            local script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+            local quality_json=$(python3 "$script_dir/quality_scorer.py" "$prompt_name" "$prompt_text" "$response_text" 2>/dev/null || echo '{}')
+            
+            if echo "$quality_json" | jq -e '.overall_score' >/dev/null 2>&1; then
+                quality_score=$(echo "$quality_json" | jq -r '.overall_score')
+                quality_details=$(echo "$quality_json" | jq -c '{subscores, issues, passed_checks}')
+                echo -e "    ${GREEN}Quality Score: ${quality_score}/100${NC}" >&2
+            fi
+        fi
+        
         # Return JSON result using jq for proper escaping (output to stdout only)
         local preview=$(echo "$response_text" | head -c 100 | tr '\n' ' ' | tr -d '\r')
         jq -n \
@@ -131,13 +145,17 @@ EOF
             --arg speed "$tokens_per_sec" \
             --arg ttft "$ttft" \
             --arg preview "$preview" \
+            --arg quality_score "$quality_score" \
+            --argjson quality_details "$quality_details" \
             '{
                 prompt_name: $name,
                 duration_seconds: ($duration | tonumber),
                 tokens_generated: ($tokens | tonumber),
                 tokens_per_second: ($speed | tonumber),
                 time_to_first_token: ($ttft | tonumber),
-                response_preview: $preview
+                response_preview: $preview,
+                quality_score: (if $quality_score == "null" then null else ($quality_score | tonumber) end),
+                quality_details: $quality_details
             }'
     else
         echo -e "    ${RED}Error: Invalid response${NC}" >&2
@@ -276,7 +294,12 @@ for model_data in data:
         name = test.get('prompt_name', 'unknown')
         duration = test.get('duration_seconds', 0)
         speed = test.get('tokens_per_second', 0)
-        print(f"    {name:15} {duration:6.2f}s  |  {speed:5.1f} tok/s")
+        quality = test.get('quality_score')
+        
+        if quality is not None:
+            print(f"    {name:15} {duration:6.2f}s  |  {speed:5.1f} tok/s  |  Q: {quality:.0f}/100")
+        else:
+            print(f"    {name:15} {duration:6.2f}s  |  {speed:5.1f} tok/s")
 
 # Recommendations
 print("\n" + "="*60)
@@ -288,18 +311,52 @@ speeds = [(m['model'], sum(t.get('tokens_per_second', 0) for t in m['tests']) / 
           for m in data if len(m['tests']) > 0]
 speeds.sort(key=lambda x: x[1], reverse=True)
 
+# Calculate average quality scores per model
+qualities = []
+for m in data:
+    quality_scores = [t.get('quality_score') for t in m['tests'] if t.get('quality_score') is not None]
+    if quality_scores:
+        avg_quality = sum(quality_scores) / len(quality_scores)
+        qualities.append((m['model'], avg_quality))
+qualities.sort(key=lambda x: x[1], reverse=True)
+
 if len(speeds) >= 2:
     print(f"\n🚀 Fastest Model:       {speeds[0][0]} ({speeds[0][1]:.1f} tok/s)")
-    print(f"🎯 Quality Model:       {speeds[-1][0]} (slower but more capable)")
+    
+    if qualities:
+        print(f"🎯 Best Quality:        {qualities[0][0]} ({qualities[0][1]:.1f}/100)")
+        print(f"\n📊 Speed vs Quality Tradeoff:")
+        for model, speed in speeds:
+            quality_match = next((q for m, q in qualities if m == model), None)
+            if quality_match:
+                print(f"   {model:20} Speed: {speed:5.1f} tok/s  |  Quality: {quality_match:5.1f}/100")
+    else:
+        print(f"🎯 Quality Model:       {speeds[-1][0]} (slower but more capable)")
+    
     print(f"\n💡 Recommendation:")
     
-    # Simple heuristic: if 70B is <3x slower than 8B, recommend it
+    # Intelligent recommendation based on speed and quality
     if '70b' in speeds[-1][0] and '8b' in speeds[0][0]:
         ratio = speeds[0][1] / speeds[-1][1]
-        if ratio < 3:
-            print(f"   Use {speeds[-1][0]} - Only {ratio:.1f}x slower but much better quality!")
+        
+        if qualities:
+            quality_8b = next((q for m, q in qualities if '8b' in m), 0)
+            quality_70b = next((q for m, q in qualities if '70b' in m), 0)
+            quality_diff = quality_70b - quality_8b
+            
+            if quality_diff > 20 and ratio < 3:
+                print(f"   🌟 Use {speeds[-1][0]} - {quality_diff:.0f}pts better quality, only {ratio:.1f}x slower!")
+            elif quality_diff > 10 and ratio < 2:
+                print(f"   ⚖️  Use {speeds[-1][0]} - Better quality ({quality_diff:.0f}pts), reasonable speed tradeoff ({ratio:.1f}x)")
+            elif quality_diff < 10:
+                print(f"   ⚡ Use {speeds[0][0]} - Quality difference small ({quality_diff:.0f}pts), much faster")
+            else:
+                print(f"   🔄 Use {speeds[0][0]} for dev, {speeds[-1][0]} for production")
         else:
-            print(f"   Use {speeds[0][0]} for development, {speeds[-1][0]} for production")
+            if ratio < 3:
+                print(f"   Use {speeds[-1][0]} - Only {ratio:.1f}x slower but much better quality!")
+            else:
+                print(f"   Use {speeds[0][0]} for development, {speeds[-1][0]} for production")
 
 print("\n" + "="*60)
 print(f"Full results saved to: {results_file}")

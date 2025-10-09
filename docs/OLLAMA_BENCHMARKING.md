@@ -13,16 +13,18 @@ The `benchmark_ollama_models.sh` script helps you **objectively compare** differ
 
 1. **Speed**: Tokens per second generation rate
 2. **Latency**: Time to first token (responsiveness)
-3. **Quality**: Response quality across different task types
+3. **Quality**: Response accuracy, completeness, instruction-following (see [Quality Scoring Guide](OLLAMA_QUALITY_SCORING.md))
 4. **Resource Usage**: Model size and memory footprint
 
 ### Test Scenarios
 
 The benchmark runs three types of prompts to simulate real mission agent tasks:
 
-- **Simple**: Basic acknowledgment (tests baseline speed)
-- **Navigation**: JSON plan generation (tests structured output)
-- **Reasoning**: Problem-solving task (tests quality/intelligence)
+- **Simple**: Basic acknowledgment (tests baseline speed + instruction following)
+- **Navigation**: JSON plan generation (tests structured output + validity)
+- **Reasoning**: Problem-solving task (tests logic + explanation quality)
+
+**New in v2.0**: Automated quality scoring inspired by OpenAI Evals and IFEval. Each response gets a 0-100 quality score based on accuracy, completeness, and task-specific criteria.
 
 ---
 
@@ -100,9 +102,9 @@ llama3.1:8b
   Avg Time to First:   0.180s
 
   Performance by Task:
-    simple           1.23s  |  12.2 tok/s
-    navigation       3.45s  |  24.6 tok/s
-    reasoning        4.12s  |  29.1 tok/s
+    simple           1.23s  |  12.2 tok/s  |  Q: 100/100
+    navigation       3.45s  |  24.6 tok/s  |  Q: 85/100
+    reasoning        4.12s  |  29.1 tok/s  |  Q: 72/100
 
 llama3.1:70b
 ------------------------------------------------------------
@@ -112,40 +114,64 @@ llama3.1:70b
   Avg Time to First:   0.850s
 
   Performance by Task:
-    simple           3.20s  |   4.7 tok/s
-    navigation       8.80s  |  10.5 tok/s
-    reasoning       12.50s  |  16.2 tok/s
+    simple           3.20s  |   4.7 tok/s  |  Q: 100/100
+    navigation       8.80s  |  10.5 tok/s  |  Q: 100/100
+    reasoning       12.50s  |  16.2 tok/s  |  Q: 96/100
 
 ============================================================
 RECOMMENDATIONS
 ============================================================
 
 🚀 Fastest Model:       llama3.1:8b (21.9 tok/s)
-🎯 Quality Model:       llama3.1:70b (slower but more capable)
+🎯 Best Quality:        llama3.1:70b (98.7/100)
+
+📊 Speed vs Quality Tradeoff:
+   llama3.1:8b          Speed: 21.9 tok/s  |  Quality: 85.7/100
+   llama3.1:70b         Speed: 10.8 tok/s  |  Quality: 98.7/100
 
 💡 Recommendation:
-   Use llama3.1:8b for development, llama3.1:70b for production
+   🌟 Use llama3.1:70b - 13pts better quality, only 2.0x slower!
 ```
+
+**Note**: Quality scores (Q: X/100) measure response accuracy and instruction-following. See [Quality Scoring Guide](OLLAMA_QUALITY_SCORING.md) for details.
 
 ---
 
 ## Metrics Explained
 
-### Tokens Per Second (tok/s)
+### Speed Metrics
+
+#### Tokens Per Second (tok/s)
 - **Higher is better**
 - How fast the model generates text
 - **8B**: Typically 15-30 tok/s
 - **70B**: Typically 5-15 tok/s
 
-### Time to First Token (TTFT)
+#### Time to First Token (TTFT)
 - **Lower is better**
 - How quickly the model starts responding
 - Important for perceived responsiveness
 - **8B**: ~0.1-0.3s
 - **70B**: ~0.5-1.5s
 
-### Duration
+#### Duration
 - Total time to complete the response
+
+### Quality Metrics
+
+#### Quality Score (0-100)
+- **Higher is better**
+- Automated evaluation of response quality
+- Measures:
+  - **Simple**: Instruction following (word count, format)
+  - **Navigation**: JSON validity, structure, completeness
+  - **Reasoning**: Answer presence, logic, explanation quality
+- **90-100**: Excellent (production-ready)
+- **75-89**: Good (usable)
+- **60-74**: Fair (consider for non-critical)
+- **<60**: Poor (significant issues)
+
+See [OLLAMA_QUALITY_SCORING.md](OLLAMA_QUALITY_SCORING.md) for complete scoring methodology.
 - Depends on both speed and response length
 
 ---
