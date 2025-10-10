@@ -70,6 +70,39 @@ if ! curl -s --max-time 5 "$OLLAMA_HOST/api/tags" > /dev/null; then
     exit 1
 fi
 echo -e "${GREEN}✓ Connected to Ollama${NC}"
+
+# Check if Ollama is using GPU acceleration
+echo -e "${YELLOW}Checking GPU acceleration...${NC}"
+if command -v nvidia-smi &> /dev/null; then
+    if nvidia-smi -L 2>/dev/null | grep -q "GPU"; then
+        echo -e "${GREEN}✓ NVIDIA GPU detected${NC}"
+        nvidia-smi --query-gpu=name,memory.total,driver_version --format=csv,noheader | head -1 | while IFS=, read -r name memory driver; do
+            echo "  GPU: $name"
+            echo "  Memory: $memory"
+            echo "  Driver: $driver"
+        done
+        
+        # Check if Docker container has GPU access
+        if command -v docker &> /dev/null && docker ps | grep -q ollama; then
+            if docker inspect ollama 2>/dev/null | grep -q "DeviceRequests"; then
+                echo -e "${GREEN}✓ Ollama container has GPU access${NC}"
+            else
+                echo -e "${RED}⚠️  Ollama container may not have GPU access${NC}"
+                echo "  Run: docker run --gpus all ... ollama/ollama"
+            fi
+        fi
+    else
+        echo -e "${YELLOW}⚠️  No NVIDIA GPU detected - using CPU${NC}"
+        echo "  Expect slower inference speeds (~10x slower)"
+    fi
+elif command -v rocm-smi &> /dev/null; then
+    echo -e "${GREEN}✓ AMD ROCm GPU detected${NC}"
+elif [ -d "/sys/class/drm" ] && ls /sys/class/drm/card*/device/driver 2>/dev/null | grep -q .; then
+    echo -e "${YELLOW}⚠️  GPU detected but not NVIDIA/AMD - may not be accelerated${NC}"
+else
+    echo -e "${YELLOW}⚠️  No GPU detected - using CPU${NC}"
+    echo "  Expect slower inference speeds (~5-10x slower than GPU)"
+fi
 echo ""
 
 # Function to format bytes to human readable
@@ -483,28 +516,56 @@ if len(speeds) >= 2:
     
     print(f"\n💡 Recommendation:")
     
+    print(f"\n💡 Recommendation:")
+    
     # Intelligent recommendation based on speed and quality
-    if '70b' in speeds[-1][0] and '8b' in speeds[0][0]:
-        ratio = speeds[0][1] / speeds[-1][1]
+    if qualities and len(qualities) >=2 and len(speeds) >= 2:
+        # Get best quality and fastest models
+        best_quality_model, best_quality_score = qualities[0]
+        fastest_model, fastest_speed = speeds[0]
         
-        if qualities:
-            quality_8b = next((q for m, q in qualities if '8b' in m), 0)
-            quality_70b = next((q for m, q in qualities if '70b' in m), 0)
-            quality_diff = quality_70b - quality_8b
-            
-            if quality_diff > 20 and ratio < 3:
-                print(f"   🌟 Use {speeds[-1][0]} - {quality_diff:.0f}pts better quality, only {ratio:.1f}x slower!")
-            elif quality_diff > 10 and ratio < 2:
-                print(f"   ⚖️  Use {speeds[-1][0]} - Better quality ({quality_diff:.0f}pts), reasonable speed tradeoff ({ratio:.1f}x)")
-            elif quality_diff < 10:
-                print(f"   ⚡ Use {speeds[0][0]} - Quality difference small ({quality_diff:.0f}pts), much faster")
-            else:
-                print(f"   🔄 Use {speeds[0][0]} for dev, {speeds[-1][0]} for production")
+        # Calculate quality/speed for best quality model
+        best_quality_speed = next((s for m, s in speeds if m == best_quality_model), 0)
+        fastest_quality = next((q for m, q in qualities if m == fastest_model), 0)
+        
+        quality_diff = best_quality_score - fastest_quality
+        speed_ratio = fastest_speed / best_quality_speed if best_quality_speed > 0 else 0
+        
+        # Make recommendation based on quality vs speed tradeoff
+        if best_quality_model == fastest_model:
+            print(f"   🌟 Use {best_quality_model} - Best quality AND fastest!")
+        elif quality_diff > 20 and speed_ratio < 3:
+            print(f"   🌟 Use {best_quality_model} - Much better quality ({quality_diff:.0f}pts), only {speed_ratio:.1f}x slower")
+        elif quality_diff > 10 and speed_ratio < 5:
+            print(f"   ⚖️  Use {best_quality_model} - Better quality ({quality_diff:.0f}pts), acceptable speed tradeoff ({speed_ratio:.1f}x)")
+        elif quality_diff < 5:
+            print(f"   ⚡ Use {fastest_model} - Similar quality ({quality_diff:.0f}pts difference), much faster ({speed_ratio:.1f}x)")
+        elif speed_ratio > 10:
+            print(f"   🔄 Use {fastest_model} for development ({fastest_speed:.1f} tok/s)")
+            print(f"      Use {best_quality_model} for production ({best_quality_score:.0f}/100 quality)")
         else:
-            if ratio < 3:
-                print(f"   Use {speeds[-1][0]} - Only {ratio:.1f}x slower but much better quality!")
-            else:
-                print(f"   Use {speeds[0][0]} for development, {speeds[-1][0]} for production")
+            # Balanced recommendation
+            mid_quality = sorted(qualities, key=lambda x: x[1], reverse=True)[len(qualities)//2]
+            print(f"   ⚖️  Recommended: {mid_quality[0]}")
+            print(f"      Best balance of speed and quality")
+            print(f"      Alternative fast: {fastest_model} ({fastest_speed:.1f} tok/s)")
+            print(f"      Alternative quality: {best_quality_model} ({best_quality_score:.0f}/100)")
+    elif len(speeds) >= 2:
+        # Fallback if no quality scores
+        fastest_model, fastest_speed = speeds[0]
+        slowest_model, slowest_speed = speeds[-1]
+        ratio = fastest_speed / slowest_speed
+        
+        if ratio < 2:
+            print(f"   🔄 Use {slowest_model} - Similar speeds, likely better quality")
+        elif ratio < 3:
+            print(f"   ⚖️  Use {fastest_model} for dev, {slowest_model} for production")
+        else:
+            print(f"   ⚡ Use {fastest_model} - {ratio:.1f}x faster")
+            print(f"      Use {slowest_model} if quality is critical")
+    else:
+        print(f"   ℹ️  Only one model tested - add more models for comparison")
+
 
 print("\n" + "="*60)
 print(f"Full results saved to: {results_file}")
