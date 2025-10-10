@@ -176,6 +176,98 @@ unload_all_models() {
     return 0
 }
 
+# Function to run GPU performance validation test
+# Uses gpt-oss:20b as baseline with known expected performance
+gpu_validation_test() {
+    local test_name=$1  # "baseline" or "final"
+    local validation_model="gpt-oss:20b"
+    local validation_prompt="why is the sky blue in one sentence"
+    local expected_min_speed=20.0  # Minimum acceptable tok/s for healthy GPU
+    
+    echo ""
+    echo -e "${BLUE}=========================================${NC}"
+    echo -e "${BLUE}GPU Performance Validation: $test_name${NC}"
+    echo -e "${BLUE}=========================================${NC}"
+    echo ""
+    
+    # Check if validation model is available
+    if ! curl -s "$OLLAMA_HOST/api/tags" | jq -r '.models[].name' | grep -q "^$validation_model$"; then
+        echo -e "${YELLOW}⚠️  Validation model $validation_model not found${NC}"
+        echo "  Skipping GPU validation test"
+        echo "  Install with: ollama pull $validation_model"
+        return 0
+    fi
+    
+    echo "Testing model: $validation_model"
+    echo "Prompt: \"$validation_prompt\""
+    echo ""
+    
+    # Run test
+    local request_json="{\"model\": \"$validation_model\", \"prompt\": \"$validation_prompt\", \"stream\": false}"
+    local start_time=$(date +%s.%N)
+    local response=$(curl -s --max-time 60 "$OLLAMA_HOST/api/generate" \
+        -H "Content-Type: application/json" \
+        -d "$request_json")
+    local end_time=$(date +%s.%N)
+    
+    # Parse results
+    if echo "$response" | jq -e . >/dev/null 2>&1; then
+        local eval_count=$(echo "$response" | jq -r '.eval_count // 0')
+        local eval_duration=$(echo "$response" | jq -r '.eval_duration // 0')
+        local prompt_eval_count=$(echo "$response" | jq -r '.prompt_eval_count // 0')
+        local prompt_eval_duration=$(echo "$response" | jq -r '.prompt_eval_duration // 0')
+        local total_duration=$(echo "$response" | jq -r '.total_duration // 0')
+        
+        # Calculate speeds
+        local eval_speed=0
+        local prompt_speed=0
+        if [ "$eval_duration" -gt 0 ] && [ "$eval_count" -gt 0 ]; then
+            eval_speed=$(echo "scale=2; $eval_count / ($eval_duration / 1000000000)" | bc)
+        fi
+        if [ "$prompt_eval_duration" -gt 0 ] && [ "$prompt_eval_count" -gt 0 ]; then
+            prompt_speed=$(echo "scale=2; $prompt_eval_count / ($prompt_eval_duration / 1000000000)" | bc)
+        fi
+        
+        # Display results
+        echo "Results:"
+        echo "  Eval tokens: $eval_count"
+        echo "  Eval speed: $eval_speed tok/s"
+        echo "  Prompt tokens: $prompt_eval_count"
+        echo "  Prompt speed: $prompt_speed tok/s"
+        echo "  Total duration: $(echo "scale=2; $total_duration / 1000000000" | bc)s"
+        echo ""
+        
+        # Check if performance is acceptable
+        if (( $(echo "$eval_speed < $expected_min_speed" | bc -l) )); then
+            echo -e "${RED}❌ WARNING: GPU performance degraded!${NC}"
+            echo -e "${RED}   Expected: ≥${expected_min_speed} tok/s${NC}"
+            echo -e "${RED}   Got: ${eval_speed} tok/s${NC}"
+            echo ""
+            echo "This suggests GPU acceleration is not working properly."
+            echo "Possible causes:"
+            echo "  - GPU context lost during benchmark"
+            echo "  - Container lost GPU access"
+            echo "  - GPU in low-power mode"
+            echo ""
+            
+            if [ "$test_name" = "final" ]; then
+                echo -e "${YELLOW}Benchmark results may be INVALID due to GPU degradation.${NC}"
+                echo -e "${YELLOW}Recommendation: Reboot Thor and re-run benchmark.${NC}"
+            fi
+            echo ""
+            return 1
+        else
+            echo -e "${GREEN}✓ GPU performance healthy: ${eval_speed} tok/s${NC}"
+            echo ""
+            return 0
+        fi
+    else
+        echo -e "${RED}❌ Validation test failed - invalid response${NC}"
+        echo ""
+        return 1
+    fi
+}
+
 # Function to estimate model size from name
 estimate_model_size_gb() {
     local model=$1
@@ -310,6 +402,10 @@ get_model_info() {
 echo -e "${YELLOW}Starting benchmark...${NC}"
 echo ""
 
+# Run baseline GPU validation test
+gpu_validation_test "baseline"
+BASELINE_TEST_RESULT=$?
+
 # Create temp directory for test results
 TEMP_DIR=$(mktemp -d)
 trap "rm -rf $TEMP_DIR" EXIT
@@ -433,6 +529,26 @@ echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━
 echo -e "${GREEN}Benchmark Complete!${NC}"
 echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo ""
+
+# Run final GPU validation test to check for degradation
+gpu_validation_test "final"
+FINAL_TEST_RESULT=$?
+
+if [ $FINAL_TEST_RESULT -ne 0 ]; then
+    echo -e "${RED}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "${RED}⚠️  GPU PERFORMANCE DEGRADATION DETECTED${NC}"
+    echo -e "${RED}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo ""
+    echo -e "${YELLOW}Benchmark results may be INVALID.${NC}"
+    echo ""
+    echo "Recommended actions:"
+    echo "  1. Reboot Thor: sudo reboot"
+    echo "  2. Re-run setup: ./scripts/setup_ollama_thor.sh"
+    echo "  3. Re-run benchmark: ./scripts/benchmark_ollama_models.sh"
+    echo ""
+    echo "See docs/THOR_PERFORMANCE_NOTES.md for details."
+    echo ""
+fi
 
 # Generate summary report
 echo -e "${BLUE}Generating summary report...${NC}"
