@@ -81,12 +81,45 @@ After running benchmark script or unloading/reloading models multiple times, GPU
 - Fresh test: **19.8 tok/s** ✅
 - After benchmark operations: **10.60 tok/s** ❌ (47% slower!)
 
+**Latest Test (2025-10-10)**:
+```
+BASELINE:          36.67 tok/s (gpt-oss:20b)  ✅
+POST-BENCHMARK:    ~5 tok/s                   ❌ (FAILED)
+```
+
 ### Root Cause
-Unknown - possibly related to:
+**UNKNOWN** - Actively investigating. Possibly related to:
 1. GPU context not being properly restored after model unload
 2. Issue specific to Jetson-optimized container
 3. CUDA context persistence issue
 4. GPU memory fragmentation
+5. Thermal throttling (unlikely - temps normal)
+
+### Impact
+- ⚠️ **CRITICAL**: Blocks reliable benchmarking
+- ⚠️ **HIGH**: May affect production use if models are unloaded/reloaded
+- ✅ **MITIGATED**: Doesn't occur during normal operation (single model kept loaded)
+
+### Investigation TODO
+
+**Priority 1: Reproduction Testing**
+- [ ] Test if issue occurs with standard ollama/ollama container
+- [ ] Test if keeping model loaded prevents degradation (keep_alive=-1)
+- [ ] Measure degradation frequency (after how many unload/reload cycles?)
+- [ ] Test with different models (phi4, qwen, llama)
+
+**Priority 2: CUDA/GPU Analysis**
+- [ ] Check if CUDA context persistence mode helps: `nvidia-smi -pm 1`
+- [ ] Monitor GPU memory fragmentation with jtop during benchmark
+- [ ] Check GPU clock speeds (scaling/throttling)
+- [ ] Test different CUDA versions
+- [ ] Check Jetson container release notes for known issues
+
+**Priority 3: Workaround Development**
+- [ ] Implement model preloading in mission agent (never unload)
+- [ ] Add GPU health monitoring (detect degradation)
+- [ ] Automatic recovery (detect + restart container?)
+- [ ] Alternative: Switch to standard container if Jetson container is cause
 
 ### Workaround
 **Reboot Thor** to restore full GPU performance. This is required:
@@ -120,23 +153,37 @@ If Test 2 is significantly slower (>20% drop), the issue is present.
    ./scripts/benchmark_ollama_models.sh
    ```
 
-2. **Avoid unnecessary unloads**: Keep models loaded when possible
-   - Use `keep_alive` parameter to keep models in memory
-   - Don't cycle through models repeatedly
-
-3. **Monitor for degradation**: Check speeds periodically
+2. **For production: Keep model loaded**: Avoid unload/reload cycles
    ```bash
-   # Quick speed check
-   time docker exec ollama ollama run gpt-oss:20b "Say hello"
+   # In mission agent or API calls
+   keep_alive: -1  # Keep forever
+   # Or
+   keep_alive: "24h"  # Keep for long duration
    ```
 
-4. **Restart container as last resort** (may lose GPU access):
+3. **Monitor for degradation**: Check speeds periodically with jtop
    ```bash
-   docker restart ollama
-   # Or better: stop and recreate
+   # Quick speed check
+   time docker exec ollama ollama run phi4:14b "Say hello"
+   
+   # Monitor with jtop
+   sudo jtop  # Watch GPU memory, utilization, clocks
+   ```
+
+4. **Recovery if degraded**: Reboot Thor (container restart may lose GPU)
+   ```bash
+   # Full recovery (clean GPU state)
+   sudo reboot
+   
+   # Or try container recreate (less reliable)
    docker stop ollama && docker rm ollama
    ./scripts/setup_ollama_thor.sh
    ```
+
+5. **Prevention**: Avoid benchmark script during production use
+   - Benchmark unloads/reloads models frequently
+   - Use dedicated testing session after reboot
+   - Don't mix benchmarking with robot operation
 
 ## GPU Status Checking
 
@@ -179,14 +226,41 @@ The `benchmark_ollama_models.sh` script:
 
 Performance drops by 50-86% when degraded.
 
+**Status (2025-10-10)**: Issue reproduced consistently, root cause under investigation
+
+### Current Production Recommendation
+- **Primary Model**: phi4:14b (fast, good quality, ~7.7GB)
+- **Deployment Strategy**: Keep model loaded, avoid unload/reload
+- **Monitoring**: Use jtop to track GPU health
+- **Recovery**: Reboot Thor if degradation detected
+- **Investigation**: Ongoing - see TODO list above
+
 ## Investigation TODO
 
+**Priority 1: Reproduction Testing**
 - [ ] Test if issue occurs with standard ollama/ollama container
-- [ ] Check if CUDA context persistence mode helps
-- [ ] Monitor GPU memory fragmentation over time
-- [ ] Test if `nvidia-smi -pm 1` (persistence mode) prevents degradation
+- [ ] Test if keeping model loaded prevents degradation (keep_alive=-1)
+- [ ] Measure degradation frequency (after how many unload/reload cycles?)
+- [ ] Test with different models (phi4, qwen, llama)
+
+**Priority 2: CUDA/GPU Analysis**
+- [ ] Check if CUDA context persistence mode helps: `nvidia-smi -pm 1`
+- [ ] Monitor GPU memory fragmentation with jtop during benchmark
+- [ ] Check GPU clock speeds (scaling/throttling)
+- [ ] Test different CUDA versions
 - [ ] Check Jetson container release notes for known issues
-- [ ] Test with different CUDA versions
+
+**Priority 3: Workaround Development**
+- [ ] Implement model preloading in mission agent (never unload)
+- [ ] Add GPU health monitoring (detect degradation)
+- [ ] Automatic recovery (detect + restart container?)
+- [ ] Alternative: Switch to standard container if Jetson container is cause
+
+**Priority 4: Community Research**
+- [ ] Search Jetson forums for similar reports
+- [ ] Check Ollama GitHub issues for Jetson-specific bugs
+- [ ] Test with different Ollama versions
+- [ ] Contact NVIDIA/Ollama maintainers if needed
 
 ## Related Files
 
