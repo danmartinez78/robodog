@@ -61,15 +61,56 @@ echo "  Unload between models: $UNLOAD_BETWEEN_MODELS"
 echo "  Clear before large models: $CLEAR_BEFORE_LARGE_MODELS"
 echo ""
 
-# Check if Ollama is running
+# Check if Ollama container is running
+echo -e "${YELLOW}Checking Ollama container status...${NC}"
+if command -v docker &> /dev/null; then
+    if ! docker ps --format '{{.Names}}' | grep -q '^ollama$'; then
+        echo -e "${YELLOW}⚠️  Ollama container not running${NC}"
+        echo ""
+        
+        # Find the setup script
+        SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+        SETUP_SCRIPT="$SCRIPT_DIR/setup_ollama_thor.sh"
+        
+        if [ -f "$SETUP_SCRIPT" ]; then
+            echo "Starting Ollama container using setup script..."
+            echo -e "${BLUE}Running: $SETUP_SCRIPT${NC}"
+            echo ""
+            
+            if bash "$SETUP_SCRIPT"; then
+                echo ""
+                echo -e "${GREEN}✓ Ollama container started successfully${NC}"
+                echo ""
+            else
+                echo -e "${RED}Failed to start Ollama container${NC}"
+                echo "Please run manually:"
+                echo "  $SETUP_SCRIPT"
+                exit 1
+            fi
+        else
+            echo -e "${RED}Error: Setup script not found at: $SETUP_SCRIPT${NC}"
+            echo ""
+            echo "Please start Ollama container manually or run:"
+            echo "  ./scripts/setup_ollama_thor.sh"
+            exit 1
+        fi
+    else
+        echo -e "${GREEN}✓ Ollama container is running${NC}"
+    fi
+else
+    echo -e "${YELLOW}⚠️  Docker not available, skipping container check${NC}"
+fi
+
+# Check if Ollama API is responding
 echo -e "${YELLOW}Checking Ollama connection...${NC}"
 if ! curl -s --max-time 5 "$OLLAMA_HOST/api/tags" > /dev/null; then
     echo -e "${RED}Error: Cannot connect to Ollama at $OLLAMA_HOST${NC}"
-    echo "Make sure Ollama container is running:"
-    echo "  docker ps | grep ollama"
+    echo "Container is running but API not responding."
+    echo "Check container logs:"
+    echo "  docker logs ollama"
     exit 1
 fi
-echo -e "${GREEN}✓ Connected to Ollama${NC}"
+echo -e "${GREEN}✓ Connected to Ollama API${NC}"
 
 # Check if Ollama is using GPU acceleration
 echo -e "${YELLOW}Checking GPU acceleration...${NC}"
