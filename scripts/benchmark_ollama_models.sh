@@ -23,9 +23,23 @@ RESULTS_FILE="ollama_benchmark_results_$(date +%Y%m%d_%H%M%S).json"
 RESULTS_DIR="${HOME}/ollama_benchmarks"
 
 # Models to test (in order of size)
+# Based on research for robot control: JSON generation, planning, reasoning
+# See docs/OLLAMA_MODEL_COMPARISON.md for selection rationale
 declare -a MODELS=(
-    "llama3.1:8b"
-    "llama3.1:70b"
+    # Tier 1: Primary Testing Candidates
+    "phi4:14b"              # Speed champion - Microsoft SOTA, ~9GB RAM
+    "qwen2.5-coder:32b"     # JSON/coding specialist - Best structured output, ~20GB RAM
+    "qwq:32b"               # Reasoning specialist - Purpose-built for complex planning, ~20GB RAM
+    
+    # Tier 2: Validation & Comparison
+    "llama3.3:70b"          # Latest Meta release - Upgrade from 3.1, ~43GB RAM
+    "deepseek-r1:7b"        # Experimental reasoning - Fast, cutting-edge, ~5GB RAM
+    
+    # Tier 3: Optional (comment out to speed up benchmarking)
+    # "hermes3:70b"         # Tool-use specialist - Future skills API expansion, ~50GB RAM
+    # "gemma2:27b"          # Google efficient model - Middle ground, ~17GB RAM
+    # "llama3.1:8b"         # Original baseline - For comparison, ~5GB RAM
+    # "llama3.1:70b"        # Original baseline - For comparison, ~43GB RAM
 )
 
 # Test prompts of varying complexity
