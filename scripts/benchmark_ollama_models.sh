@@ -22,7 +22,7 @@ OLLAMA_HOST="${OLLAMA_HOST:-http://localhost:11434}"
 RESULTS_FILE="ollama_benchmark_results_$(date +%Y%m%d_%H%M%S).json"
 RESULTS_DIR="${HOME}/ollama_benchmarks"
 UNLOAD_BETWEEN_MODELS="${UNLOAD_BETWEEN_MODELS:-true}"  # Unload models to prevent memory buildup
-RESTART_ON_LARGE_MODELS="${RESTART_ON_LARGE_MODELS:-true}"  # Restart container before testing large models (>40GB)
+CLEAR_BEFORE_LARGE_MODELS="${CLEAR_BEFORE_LARGE_MODELS:-true}"  # Unload all models before testing large ones (>40GB)
 
 # Models to test (in order of size)
 # Based on research for robot control: JSON generation, planning, reasoning
@@ -58,7 +58,7 @@ echo "  Ollama Host: $OLLAMA_HOST"
 echo "  Results Dir: $RESULTS_DIR"
 echo "  Models to test: ${MODELS[@]}"
 echo "  Unload between models: $UNLOAD_BETWEEN_MODELS"
-echo "  Restart for large models: $RESTART_ON_LARGE_MODELS"
+echo "  Clear before large models: $CLEAR_BEFORE_LARGE_MODELS"
 echo ""
 
 # Check if Ollama is running
@@ -143,39 +143,37 @@ unload_model() {
     echo -e "${GREEN}  ✓ Model unloaded${NC}" >&2
 }
 
-# Function to restart Ollama container (for large models or memory issues)
-restart_ollama_container() {
-    if ! command -v docker &> /dev/null; then
-        echo -e "${YELLOW}  Docker not available, skipping restart${NC}" >&2
-        return 1
-    fi
+# Function to aggressively unload all models (instead of restarting container)
+# IMPORTANT: Do NOT restart container - it may lose GPU access!
+unload_all_models() {
+    echo -e "${YELLOW}  Unloading all models to clear memory...${NC}" >&2
     
-    echo -e "${YELLOW}  Restarting Ollama container to clear memory...${NC}" >&2
+    # Get list of all loaded models
+    local loaded_models=$(curl -s "$OLLAMA_HOST/api/ps" 2>/dev/null | jq -r '.models[].name' 2>/dev/null)
     
-    docker restart ollama > /dev/null 2>&1
-    
-    if [ $? -eq 0 ]; then
-        echo -e "${YELLOW}  Waiting 15s for Ollama to stabilize...${NC}" >&2
-        sleep 15
-        
-        # Wait for API to be responsive
-        local max_attempts=6
-        local attempt=0
-        while [ $attempt -lt $max_attempts ]; do
-            if curl -s --max-time 5 "$OLLAMA_HOST/api/tags" > /dev/null 2>&1; then
-                echo -e "${GREEN}  ✓ Container restarted and ready${NC}" >&2
-                return 0
+    if [ -n "$loaded_models" ]; then
+        echo "$loaded_models" | while read -r model; do
+            if [ -n "$model" ]; then
+                echo -e "${YELLOW}    Unloading: $model${NC}" >&2
+                curl -s "$OLLAMA_HOST/api/generate" \
+                    -d "{\"model\": \"$model\", \"keep_alive\": 0}" > /dev/null 2>&1
             fi
-            attempt=$((attempt + 1))
-            sleep 5
         done
         
-        echo -e "${RED}  ⚠ Container restarted but API not responsive${NC}" >&2
-        return 1
+        # Wait for models to unload
+        sleep 5
+        echo -e "${GREEN}  ✓ Models unloaded${NC}" >&2
     else
-        echo -e "${RED}  ⚠ Failed to restart container${NC}" >&2
-        return 1
+        echo -e "${YELLOW}  No models currently loaded${NC}" >&2
     fi
+    
+    # Check memory freed
+    if command -v docker &> /dev/null && docker ps | grep -q ollama; then
+        local mem_after=$(check_memory_usage)
+        echo -e "${GREEN}  ✓ Memory usage: ${mem_after}GB${NC}" >&2
+    fi
+    
+    return 0
 }
 
 # Function to estimate model size from name
@@ -330,8 +328,8 @@ for model in "${MODELS[@]}"; do
     # Estimate model size and decide if restart needed
     estimated_size=$(estimate_model_size_gb "$model")
     if [ "$RESTART_ON_LARGE_MODELS" = "true" ] && [ "$estimated_size" -gt 40 ]; then
-        echo -e "${YELLOW}Large model detected (~${estimated_size}GB). Restarting container to ensure clean state...${NC}"
-        restart_ollama_container
+        echo -e "${YELLOW}Large model detected (~${estimated_size}GB). Unloading all models to ensure clean state...${NC}"
+        unload_all_models
     fi
     
     # Check if model exists, pull if not
@@ -363,17 +361,17 @@ for model in "${MODELS[@]}"; do
     if echo "$warmup_response" | grep -q "500 Internal Server Error\|EOF"; then
         echo -e "${RED}✗ Failed to load model (memory issue or crash)${NC}"
         echo -e "${RED}  Error: $warmup_response${NC}"
-        echo -e "${YELLOW}  Attempting container restart...${NC}"
+        echo -e "${YELLOW}  Unloading all models and retrying...${NC}"
         
-        restart_ollama_container
+        unload_all_models
         
-        # Retry warmup after restart
+        # Retry warmup after unloading
         echo -e "${YELLOW}  Retrying model load...${NC}"
         warmup_response=$(curl -s --max-time 60 "$OLLAMA_HOST/api/generate" \
             -d "{\"model\": \"$model\", \"prompt\": \"Hi\", \"stream\": false}" 2>&1)
         
         if echo "$warmup_response" | grep -q "500 Internal Server Error\|EOF"; then
-            echo -e "${RED}✗ Model still fails to load after restart. Skipping...${NC}"
+            echo -e "${RED}✗ Model still fails to load after clearing memory. Skipping...${NC}"
             echo -e "${RED}  This model may be too large for available memory.${NC}"
             echo ""
             continue
