@@ -10,19 +10,54 @@
 
 ## Pre-Deployment Validation
 
-### ✅ Prerequisites (Completed)
+### ✅ Prerequisites (Updated 2025-10-10 EOD)
 
-- [x] Ollama container running on Thor
-- [x] qwen2.5-coder:32b model pulled (PRIMARY, 98/100 quality)
-- [x] phi4:14b model pulled (BACKUP, 86.7/100 quality)
-- [x] Models tested and working (verified 2025-10-10)
-- [x] Container memory stable (~20GB per model, 28GB total)
-- [x] Benchmark documentation complete
-- [x] Memory management improvements implemented
+- [x] Ollama container running on Thor (Jetson-optimized)
+- [x] phi4:14b model pulled (PRIMARY for testing, ~7.7GB)
+- [x] qwen2.5-coder:32b model pulled (BACKUP, 98/100 quality, slower)
+- [x] Models available and working (basic validation done)
+- [x] Backend validation system implemented (two-layer)
+- [x] Container memory stable
+- [x] Benchmark infrastructure complete
+- [ ] ⚠️ **jtop NOT YET INSTALLED** - Need GPU monitoring before robot test
+- [ ] ⚠️ **GPU degradation issue unresolved** - Workaround: reboot Thor before testing
+- [ ] ⚠️ **Benchmark incomplete** - GPU degradation invalidated results (~5 tok/s post-test)
+
+**STATUS**: Ready for robot testing with phi4:14b after Thor reboot and jtop installation
 
 ---
 
 ## Test Plan: End-to-End Robot Integration
+
+**⚠️ IMPORTANT PRE-TEST STEPS** (Added 2025-10-10):
+
+1. **Reboot Thor for clean GPU state**
+   ```bash
+   # On Thor
+   sudo reboot
+   # Wait for system to come back up (~2 min)
+   ```
+
+2. **Install jtop for GPU monitoring**
+   ```bash
+   cd ~/shadowhound
+   git pull origin feature/local-llm-support
+   sudo ./scripts/install_jtop_thor.sh
+   # Verify: systemctl status jtop.service
+   # Verify: sudo jtop (should show GPU memory, not N/A)
+   ```
+
+3. **Verify phi4:14b baseline performance**
+   ```bash
+   docker exec ollama ollama run --verbose phi4:14b "Count to 10"
+   # Expected: 15-20 tok/s (eval rate)
+   # If much slower, investigate GPU degradation
+   ```
+
+4. **Setup monitoring terminals**
+   - Terminal 1: `sudo jtop` (watch GPU memory/utilization)
+   - Terminal 2: Mission agent logs
+   - Terminal 3: `ros2 topic echo /cmd_vel` (robot commands)
 
 ### Phase 1: Mission Agent Startup (15 min)
 
@@ -30,29 +65,32 @@
 
 **On laptop** (in devcontainer):
 ```bash
-# Launch mission agent with Ollama configuration
+# Launch mission agent with phi4:14b (PRIMARY TEST MODEL)
 ros2 launch shadowhound_mission_agent mission_agent.launch.py \
     agent_backend:=ollama \
     ollama_base_url:=http://192.168.50.10:11434 \
-    ollama_model:=qwen2.5-coder:32b \
+    ollama_model:=phi4:14b \
     web_host:=0.0.0.0 \
     web_port:=8080
+
+# Alternative: qwen2.5-coder:32b (if phi4 has issues)
+# ollama_model:=qwen2.5-coder:32b
 ```
 
 **Expected Output**:
 ```
 [INFO] [mission_agent]: Starting Mission Agent with Ollama backend
 [INFO] [mission_agent]: Ollama URL: http://192.168.50.10:11434
-[INFO] [mission_agent]: Model: qwen2.5-coder:32b
+[INFO] [mission_agent]: Model: phi4:14b
 ============================================================
 🔍 VALIDATING LLM BACKEND CONNECTION
 ============================================================
 Testing ollama backend...
   URL: http://192.168.50.10:11434
-  Model: qwen2.5-coder:32b
+  Model: phi4:14b
   Checking Ollama service...
   ✅ Ollama service responding
-  ✅ Model 'qwen2.5-coder:32b' available
+  ✅ Model 'phi4:14b' available
   Sending test prompt...
   ✅ Test prompt succeeded (response: 'OK')
 ============================================================
@@ -65,12 +103,16 @@ Testing ollama backend...
 
 **New Feature**: The mission agent now **automatically validates** the LLM backend connection on startup. If validation fails, the node exits immediately with a clear error message. See `docs/LLM_BACKEND_VALIDATION.md` for details.
 
+**⚠️ Watch jtop Terminal**: Should see GPU memory jump to ~7-8GB when phi4:14b loads on first request
+
 **Verify**:
 - [ ] Mission agent starts without errors
 - [ ] **Backend validation PASSED** (automatic on startup)
 - [ ] Ollama connection successful
-- [ ] Model loads correctly (check first response latency)
+- [ ] Model loads correctly (watch jtop: ~7-8GB GPU memory for phi4:14b)
+- [ ] First response <5 seconds (phi4 is fast: 15-20 tok/s expected)
 - [ ] No timeout errors
+- [ ] jtop shows GPU memory stable (not increasing rapidly)
 
 **Troubleshooting**:
 - If **validation fails**: See error message for specific issue (service unreachable, model not found, etc.)
@@ -88,7 +130,7 @@ Testing ollama backend...
 **Verify**:
 - [ ] Dashboard loads successfully
 - [ ] Backend indicator shows "OLLAMA" (not "OPENAI")
-- [ ] Model name displays: "qwen2.5-coder:32b"
+- [ ] Model name displays: "phi4:14b" (or qwen2.5-coder:32b if using backup)
 - [ ] Connection status: GREEN
 - [ ] No JavaScript console errors
 
@@ -104,8 +146,10 @@ Testing ollama backend...
 
 **Expected LLM Response**:
 - Should identify as robot assistant
-- Concise response (JSON specialist, not verbose)
-- Fast response (<5 seconds for qwen2.5-coder:32b at 4.4 tok/s)
+- Concise response (phi4 is direct, not overly verbose)
+- Fast response (<3 seconds for phi4:14b at 15-20 tok/s expected)
+
+**⚠️ Watch for GPU Degradation**: If response is slow (>10s), check jtop for issues
 
 **Verify**:
 - [ ] Response received within 10 seconds
@@ -139,7 +183,7 @@ ros2 topic echo /shadowhound/mission/status
 - [ ] JSON structure is valid
 - [ ] Skills are correctly identified (nav.goto, nav.rotate)
 - [ ] Parameters have reasonable values
-- [ ] qwen2.5-coder excels at structured output (benchmark winner)
+- [ ] phi4:14b produces valid JSON (good structured output capability)
 
 **Compare**: Try same mission with OpenAI backend later to validate quality difference
 
@@ -156,8 +200,8 @@ ros2 topic echo /shadowhound/mission/status
 
 **Verify**:
 - [ ] Correct reasoning
-- [ ] Not overly verbose (qwq:32b was too verbose, qwen should be concise)
-- [ ] Fast response (<10 seconds)
+- [ ] Not overly verbose (phi4 should be concise)
+- [ ] Fast response (<5 seconds)
 
 ---
 
@@ -186,6 +230,7 @@ ros2 topic echo /shadowhound/mission/status
 - [ ] Distance approximately correct (±0.2m tolerance)
 - [ ] Mission completes successfully
 - [ ] Dashboard shows "SUCCESS" status
+- [ ] **jtop shows stable GPU memory** (no sudden spikes or leaks)
 
 **Logs to Check**:
 ```bash
@@ -273,11 +318,13 @@ Execute 10 simple missions and measure:
 - Total completion time
 - End-to-end mission time (LLM + skill execution)
 
-**Target Performance** (based on benchmarks):
-- TTFT: <2 seconds
-- Simple text response: <5 seconds
-- JSON navigation plan: <8 seconds
-- Quality score: >90/100 (use quality_scorer.py)
+**Target Performance** (based on preliminary observations):
+- TTFT: <2 seconds (phi4 is fast)
+- Simple text response: <3 seconds
+- JSON navigation plan: <5 seconds
+- Quality: Good reasoning and JSON generation
+
+**⚠️ Known Issue**: GPU degradation may occur after multiple model unload/reload cycles. If speeds drop significantly, note in results and plan investigation.
 
 **Record Results**:
 ```bash
@@ -302,20 +349,25 @@ Run 20+ missions consecutively and monitor:
 
 **On Thor**:
 ```bash
-# Monitor container memory
+# Monitor container memory (watch for GPU memory specifically with jtop)
 watch -n 10 'docker stats ollama --no-stream'
+
+# Also monitor GPU memory with jtop
+sudo jtop  # Watch GPU section
 ```
 
 **Verify**:
-- [ ] Memory usage stable (~20GB for qwen2.5-coder:32b)
-- [ ] No memory leaks (gradual increase)
+- [ ] GPU memory usage stable (~7-8GB for phi4:14b)
+- [ ] No memory leaks (gradual increase in GPU VRAM)
 - [ ] No OOM errors
-- [ ] Model stays loaded between missions
+- [ ] Model stays loaded between missions (jtop GPU memory stays elevated)
+- [ ] **No performance degradation** (if speeds drop >20%, investigate)
 
 **Expected Memory**:
-- Initial: ~1GB (empty container)
-- After first mission: ~20GB (model loaded)
-- After 20 missions: Still ~20GB (stable)
+- Initial: ~500MB (empty container)
+- After first mission: ~7-8GB GPU VRAM (model loaded)
+- After 20 missions: Still ~7-8GB GPU VRAM (stable)
+- Container RAM: ~2-3GB (stable)
 
 ---
 
