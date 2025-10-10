@@ -119,8 +119,20 @@ format_bytes() {
     fi
 }
 
-# Function to check container memory usage
+# Function to check GPU memory usage (more accurate than container stats)
 check_memory_usage() {
+    # Try to get GPU memory usage first (where models actually live)
+    if command -v nvidia-smi &> /dev/null; then
+        local gpu_mem=$(nvidia-smi --query-gpu=memory.used --format=csv,noheader,nounits 2>/dev/null | head -1)
+        if [ -n "$gpu_mem" ] && [ "$gpu_mem" != "0" ]; then
+            # Convert MB to GB
+            local gpu_mem_gb=$(echo "scale=2; $gpu_mem / 1024" | bc)
+            echo "$gpu_mem_gb"
+            return
+        fi
+    fi
+    
+    # Fallback to container memory (less accurate for GPU workloads)
     if command -v docker &> /dev/null; then
         local mem_usage=$(docker stats ollama --no-stream --format "{{.MemUsage}}" 2>/dev/null | cut -d'/' -f1 | tr -d 'GiB' | tr -d ' ' || echo "0")
         echo "$mem_usage"
@@ -418,7 +430,7 @@ for model in "${MODELS[@]}"; do
     # Check memory usage before loading new model
     mem_before=$(check_memory_usage)
     if [ "$mem_before" != "0" ]; then
-        echo -e "${BLUE}Container memory before: ${mem_before}GiB${NC}"
+        echo -e "${BLUE}GPU memory before: ${mem_before}GB${NC}"
     fi
     
     # Estimate model size and unload all models before large ones to prevent memory issues
@@ -493,7 +505,7 @@ for model in "${MODELS[@]}"; do
     mem_after=$(check_memory_usage)
     if [ "$mem_after" != "0" ] && [ "$mem_before" != "0" ]; then
         mem_delta=$(echo "$mem_after - $mem_before" | bc)
-        echo -e "${BLUE}Container memory after: ${mem_after}GiB (+${mem_delta}GiB)${NC}"
+        echo -e "${BLUE}GPU memory after: ${mem_after}GB (+${mem_delta}GB)${NC}"
     fi
     echo ""
     
@@ -526,7 +538,7 @@ for model in "${MODELS[@]}"; do
         # Check memory after unload
         mem_unload=$(check_memory_usage)
         if [ "$mem_unload" != "0" ]; then
-            echo -e "${BLUE}Container memory after unload: ${mem_unload}GiB${NC}"
+            echo -e "${BLUE}GPU memory after unload: ${mem_unload}GB${NC}"
         fi
     fi
     
