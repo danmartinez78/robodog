@@ -21,11 +21,11 @@ CONTAINER_NAME="ollama"
 DATA_DIR="${HOME}/ollama-data"
 OLLAMA_PORT=11434
 
-# Model recommendations based on Thor's 128GB RAM
-# NOTE: llama3.1 only exists in 8B, 70B, and 405B sizes (NO 13B variant!)
-# Source: https://ollama.com/library/llama3.1/tags
-PRIMARY_MODEL="llama3.1:70b"    # ~43GB download, ~60-70GB RAM (BEST quality for Thor's 128GB!)
-BACKUP_MODEL="llama3.1:8b"      # ~4.9GB download, ~10-12GB RAM (lighter fallback)
+# Model recommendations based on Thor's 128GB RAM and benchmark results
+# Benchmarked 2025-01-10: qwen2.5-coder:32b WINNER (98/100 quality, JSON specialist)
+# See docs/OLLAMA_BENCHMARK_RESULTS.md for full analysis
+PRIMARY_MODEL="qwen2.5-coder:32b"  # ~20GB download, ~20GB RAM (JSON specialist, 98/100 quality)
+BACKUP_MODEL="phi4:14b"            # ~9GB download, ~9GB RAM (fast fallback, 86.7/100 quality, 20 tok/s)
 
 echo -e "${YELLOW}Step 1: Checking prerequisites...${NC}"
 
@@ -134,30 +134,31 @@ fi
 echo ""
 echo -e "${YELLOW}Step 7: Pulling model...${NC}"
 echo ""
-echo "Note: llama3.1 comes in 8B, 70B, and 405B sizes."
-echo "With Thor's 128GB RAM, we can run the excellent 70B model!"
-echo "  - 70B model (~43 GB) - Top-tier quality, near GPT-4 level"
-echo "  - 8B model (~4.9 GB) - Faster fallback option"
+echo "Based on comprehensive benchmarking (2025-01-10):"
+echo "  - PRIMARY: qwen2.5-coder:32b (~20GB) - 98/100 quality, JSON specialist"
+echo "  - BACKUP: phi4:14b (~9GB) - 86.7/100 quality, 4.6x faster"
+echo ""
+echo "See docs/OLLAMA_BENCHMARK_RESULTS.md for full analysis"
 echo ""
 
-# Pull the 70B model
+# Pull the primary model
 echo -e "${YELLOW}Pulling $PRIMARY_MODEL...${NC}"
-echo "Expected size: ~43 GB | RAM usage: ~60-70 GB"
-echo "This will take a while on first download (~15-30 min depending on connection)..."
+echo "Expected size: ~20 GB | RAM usage: ~20 GB"
+echo "This will take 5-15 minutes depending on connection..."
 if docker exec "$CONTAINER_NAME" ollama pull "$PRIMARY_MODEL" 2>&1; then
     echo -e "${GREEN}✓ $PRIMARY_MODEL ready${NC}"
 else
     echo -e "${RED}Failed to pull $PRIMARY_MODEL${NC}"
     echo ""
-    echo "Available models can be checked at: https://ollama.com/library/llama3.1/tags"
+    echo "Available models can be checked at: https://ollama.com/library"
     echo "Or run: docker exec ollama ollama list"
     exit 1
 fi
 
 # Ask about backup model
 echo ""
-echo -e "${YELLOW}Optional: Pull lighter backup model for faster responses?${NC}"
-read -p "Pull backup model $BACKUP_MODEL (~5GB, faster inference)? (y/N): " -n 1 -r
+echo -e "${YELLOW}Optional: Pull fast backup model for development?${NC}"
+read -p "Pull backup model $BACKUP_MODEL (~9GB, 4.6x faster than primary)? (y/N): " -n 1 -r
 echo
 if [[ $REPLY =~ ^[Yy]$ ]]; then
     echo -e "${YELLOW}Pulling $BACKUP_MODEL...${NC}"
