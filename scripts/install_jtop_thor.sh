@@ -101,6 +101,28 @@ apply_thor_edits() {
   log "Thor edits applied."
 }
 
+install_python_fixes() {
+  set -euo pipefail
+  local repo="$REPO_DIR"
+  local patch="$(dirname "$0")/patch_thor_jp7_in_repo.sh"
+  
+  log "Installing python script changes for Jetson Thor (JP7.0) in: $repo"
+  
+  [[ -d "$repo/.git" && -d "$repo/jtop" ]] || {
+    echo "ERROR: $repo does not look like a jetson_stats clone"
+    return 1
+  }
+  
+  if [[ ! -f "$patch" ]]; then
+    echo "ERROR: patch script not found at $patch" >&2
+    return 1
+  fi
+  
+  chmod +x "$patch"
+  # Run patch script (it will sudo itself if needed)
+  "$patch" "$repo"
+}
+
 install_package() {
   log "Installing jetson_stats into the venv"
   "$VENV_DIR/bin/python" -m pip install --no-cache-dir -U "$REPO_DIR"
@@ -180,6 +202,7 @@ main() {
   create_venv
   clone_repo
   apply_thor_edits
+  install_python_fixes
   install_package
   install_nvml
   install_service
