@@ -670,6 +670,138 @@ check_dependencies() {
 }
 
 # ============================================================================
+# LLM Backend Validation
+# ============================================================================
+
+check_llm_backend() {
+    print_section "LLM Backend Check"
+    
+    local agent_backend=${AGENT_BACKEND:-openai}
+    
+    print_info "Configured backend: $agent_backend"
+    
+    if [ "$agent_backend" = "ollama" ]; then
+        local ollama_url=${OLLAMA_BASE_URL:-http://192.168.50.10:11434}
+        local ollama_model=${OLLAMA_MODEL:-qwen2.5-coder:32b}
+        
+        print_info "Ollama URL: $ollama_url"
+        print_info "Ollama Model: $ollama_model"
+        echo ""
+        
+        # Step 1: Check if Ollama service is responding
+        print_info "1. Checking Ollama service reachability..."
+        if ! curl -s --max-time 5 "$ollama_url/api/tags" > /dev/null 2>&1; then
+            print_error "Cannot reach Ollama service at $ollama_url"
+            echo ""
+            echo "Possible issues:"
+            echo "  • Ollama service not running"
+            echo "  • Wrong URL (check OLLAMA_BASE_URL in .env)"
+            echo "  • Network/firewall blocking connection"
+            echo "  • Thor not powered on (if using remote Ollama)"
+            echo ""
+            print_info "To fix:"
+            echo "  • Check Ollama status: docker ps | grep ollama"
+            echo "  • Test manually: curl $ollama_url/api/tags"
+            echo "  • Update .env with correct OLLAMA_BASE_URL"
+            echo ""
+            
+            read -p "Continue anyway? (Mission agent will fail) [y/N]: " continue_choice
+            if [[ "$continue_choice" != "y" && "$continue_choice" != "Y" ]]; then
+                print_info "Exiting. Fix Ollama connection and try again."
+                exit 1
+            fi
+            print_warning "Continuing with unreachable backend - expect failures"
+            return 0
+        fi
+        print_success "Ollama service responding"
+        
+        # Step 2: Check if model is available
+        print_info "2. Checking if model '$ollama_model' is available..."
+        local models_json=$(curl -s --max-time 5 "$ollama_url/api/tags" 2>/dev/null)
+        
+        if [ -z "$models_json" ]; then
+            print_warning "Could not retrieve model list from Ollama"
+        elif ! echo "$models_json" | grep -q "\"name\":\"$ollama_model\""; then
+            print_error "Model '$ollama_model' not found in Ollama"
+            echo ""
+            echo "Available models:"
+            echo "$models_json" | grep -o '"name":"[^"]*"' | cut -d'"' -f4 | sed 's/^/  • /'
+            echo ""
+            print_info "To fix:"
+            echo "  • Pull the model: ollama pull $ollama_model"
+            echo "  • Or update OLLAMA_MODEL in .env to use an available model"
+            echo ""
+            
+            read -p "Continue anyway? (Mission agent will fail) [y/N]: " continue_choice
+            if [[ "$continue_choice" != "y" && "$continue_choice" != "Y" ]]; then
+                print_info "Exiting. Pull the model and try again."
+                exit 1
+            fi
+            print_warning "Continuing with missing model - expect failures"
+            return 0
+        fi
+        print_success "Model '$ollama_model' is available"
+        
+        # Step 3: Quick test prompt (optional, can be slow)
+        print_info "3. Testing model response (this may take a few seconds)..."
+        local test_start=$(date +%s 2>/dev/null || echo 0)
+        local test_response=$(curl -s --max-time 30 "$ollama_url/api/generate" \
+            -d "{\"model\": \"$ollama_model\", \"prompt\": \"Say OK\", \"stream\": false}" 2>/dev/null)
+        local test_end=$(date +%s 2>/dev/null || echo 0)
+        local test_duration=$((test_end - test_start))
+        
+        if echo "$test_response" | grep -q '"response"'; then
+            print_success "Model responded successfully (${test_duration}s)"
+            local response_text=$(echo "$test_response" | grep -o '"response":"[^"]*"' | cut -d'"' -f4 | head -c 50)
+            print_info "Response: $response_text"
+        else
+            print_warning "Model test prompt timed out or failed"
+            print_info "Model may be cold-loading (first request after pull)"
+            print_warning "Mission agent startup may be slow on first run"
+        fi
+        
+        echo ""
+        print_success "Ollama backend validation passed!"
+        
+    elif [ "$agent_backend" = "openai" ]; then
+        print_info "Backend: OpenAI"
+        echo ""
+        
+        # Check API key
+        if [ -z "$OPENAI_API_KEY" ]; then
+            print_error "OPENAI_API_KEY not set in environment"
+            echo ""
+            print_info "To fix:"
+            echo "  • Add OPENAI_API_KEY to .env file"
+            echo "  • Get API key from: https://platform.openai.com/api-keys"
+            echo ""
+            exit 1
+        fi
+        
+        # Quick format check
+        if [[ ! "$OPENAI_API_KEY" =~ ^sk- ]]; then
+            print_warning "OPENAI_API_KEY doesn't start with 'sk-' (unusual format)"
+        fi
+        
+        print_success "OPENAI_API_KEY is configured"
+        print_info "Model: ${OPENAI_MODEL:-gpt-4o}"
+        
+        # Optional: Test API key (requires network call, can be slow)
+        # Skipped for now to keep startup fast
+        # User will get immediate feedback from mission agent if key is invalid
+        
+        echo ""
+        print_success "OpenAI backend validation passed!"
+        
+    else
+        print_error "Unknown backend: $agent_backend"
+        print_info "Valid backends: openai, ollama"
+        print_info "Check AGENT_BACKEND in .env file"
+        exit 1
+    fi
+}
+
+# ============================================================================
 # Network Checks
 # ============================================================================
 
@@ -743,7 +875,13 @@ EOF
     echo "  • Web Interface: ${WEB_INTERFACE:-true}"
     echo "  • Web Port: ${WEB_PORT:-8080}"
     echo "  • ROS Domain: ${ROS_DOMAIN_ID:-0}"
-    echo "  • OpenAI Model: ${OPENAI_MODEL:-gpt-4o}"
+    echo "  • LLM Backend: ${AGENT_BACKEND:-openai}"
+    if [ "${AGENT_BACKEND:-openai}" = "ollama" ]; then
+        echo "  • Ollama URL: ${OLLAMA_BASE_URL:-http://192.168.50.10:11434}"
+        echo "  • Ollama Model: ${OLLAMA_MODEL:-qwen2.5-coder:32b}"
+    else
+        echo "  • OpenAI Model: ${OPENAI_MODEL:-gpt-4o}"
+    fi
     echo ""
     if [ "${CONN_TYPE:-webrtc}" = "webrtc" ]; then
         echo -e "${CYAN}${INFO} WebRTC mode enabled - robot must be on WiFi network${NC}"
@@ -1233,6 +1371,7 @@ main() {
     check_system
     check_git_updates  # NEW: Check for repo/submodule updates
     setup_config
+    check_llm_backend  # IMPORTANT: Check LLM backend early, before heavy lifting
     build_workspace
     check_dependencies
     check_network
