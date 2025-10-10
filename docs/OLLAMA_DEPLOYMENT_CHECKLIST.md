@@ -44,22 +44,40 @@ ros2 launch shadowhound_mission_agent mission_agent.launch.py \
 [INFO] [mission_agent]: Starting Mission Agent with Ollama backend
 [INFO] [mission_agent]: Ollama URL: http://192.168.50.10:11434
 [INFO] [mission_agent]: Model: qwen2.5-coder:32b
-[INFO] [mission_agent]: Testing LLM connection...
-[INFO] [mission_agent]: ✓ LLM connection successful
+============================================================
+🔍 VALIDATING LLM BACKEND CONNECTION
+============================================================
+Testing ollama backend...
+  URL: http://192.168.50.10:11434
+  Model: qwen2.5-coder:32b
+  Checking Ollama service...
+  ✅ Ollama service responding
+  ✅ Model 'qwen2.5-coder:32b' available
+  Sending test prompt...
+  ✅ Test prompt succeeded (response: 'OK')
+============================================================
+✅ Ollama backend validation PASSED
+============================================================
+[INFO] [mission_agent]: MissionExecutor ready!
 [INFO] [mission_agent]: Web dashboard: http://0.0.0.0:8080
 [INFO] [mission_agent]: Ready to accept missions
 ```
 
+**New Feature**: The mission agent now **automatically validates** the LLM backend connection on startup. If validation fails, the node exits immediately with a clear error message. See `docs/LLM_BACKEND_VALIDATION.md` for details.
+
 **Verify**:
 - [ ] Mission agent starts without errors
+- [ ] **Backend validation PASSED** (automatic on startup)
 - [ ] Ollama connection successful
 - [ ] Model loads correctly (check first response latency)
 - [ ] No timeout errors
 
 **Troubleshooting**:
+- If **validation fails**: See error message for specific issue (service unreachable, model not found, etc.)
 - If connection fails: Check `OLLAMA_BASE_URL` matches Thor IP
 - If model not found: Verify model pulled on Thor (`docker exec ollama ollama list`)
 - If timeout: Check Thor firewall allows port 11434
+- **See detailed troubleshooting**: `docs/LLM_BACKEND_VALIDATION.md`
 
 ---
 
