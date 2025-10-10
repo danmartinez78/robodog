@@ -21,6 +21,8 @@ NC='\033[0m'
 OLLAMA_HOST="${OLLAMA_HOST:-http://localhost:11434}"
 RESULTS_FILE="ollama_benchmark_results_$(date +%Y%m%d_%H%M%S).json"
 RESULTS_DIR="${HOME}/ollama_benchmarks"
+UNLOAD_BETWEEN_MODELS="${UNLOAD_BETWEEN_MODELS:-true}"  # Unload models to prevent memory buildup
+RESTART_ON_LARGE_MODELS="${RESTART_ON_LARGE_MODELS:-true}"  # Restart container before testing large models (>40GB)
 
 # Models to test (in order of size)
 # Based on research for robot control: JSON generation, planning, reasoning
@@ -55,6 +57,8 @@ echo -e "${BLUE}Configuration:${NC}"
 echo "  Ollama Host: $OLLAMA_HOST"
 echo "  Results Dir: $RESULTS_DIR"
 echo "  Models to test: ${MODELS[@]}"
+echo "  Unload between models: $UNLOAD_BETWEEN_MODELS"
+echo "  Restart for large models: $RESTART_ON_LARGE_MODELS"
 echo ""
 
 # Check if Ollama is running
@@ -79,6 +83,80 @@ format_bytes() {
         echo "$(( bytes / 1048576 ))MB"
     else
         echo "$(( bytes / 1073741824 ))GB"
+    fi
+}
+
+# Function to check container memory usage
+check_memory_usage() {
+    if command -v docker &> /dev/null; then
+        local mem_usage=$(docker stats ollama --no-stream --format "{{.MemUsage}}" 2>/dev/null | cut -d'/' -f1 | tr -d 'GiB' | tr -d ' ' || echo "0")
+        echo "$mem_usage"
+    else
+        echo "0"
+    fi
+}
+
+# Function to unload a specific model from memory
+unload_model() {
+    local model=$1
+    echo -e "${YELLOW}  Unloading $model from memory...${NC}" >&2
+    
+    # Send an empty prompt to explicitly stop the model
+    curl -s --max-time 10 -X POST "$OLLAMA_HOST/api/generate" \
+        -H "Content-Type: application/json" \
+        -d "{\"model\": \"$model\", \"prompt\": \"\", \"keep_alive\": 0}" > /dev/null 2>&1
+    
+    sleep 2
+    echo -e "${GREEN}  ✓ Model unloaded${NC}" >&2
+}
+
+# Function to restart Ollama container (for large models or memory issues)
+restart_ollama_container() {
+    if ! command -v docker &> /dev/null; then
+        echo -e "${YELLOW}  Docker not available, skipping restart${NC}" >&2
+        return 1
+    fi
+    
+    echo -e "${YELLOW}  Restarting Ollama container to clear memory...${NC}" >&2
+    
+    docker restart ollama > /dev/null 2>&1
+    
+    if [ $? -eq 0 ]; then
+        echo -e "${YELLOW}  Waiting 15s for Ollama to stabilize...${NC}" >&2
+        sleep 15
+        
+        # Wait for API to be responsive
+        local max_attempts=6
+        local attempt=0
+        while [ $attempt -lt $max_attempts ]; do
+            if curl -s --max-time 5 "$OLLAMA_HOST/api/tags" > /dev/null 2>&1; then
+                echo -e "${GREEN}  ✓ Container restarted and ready${NC}" >&2
+                return 0
+            fi
+            attempt=$((attempt + 1))
+            sleep 5
+        done
+        
+        echo -e "${RED}  ⚠ Container restarted but API not responsive${NC}" >&2
+        return 1
+    else
+        echo -e "${RED}  ⚠ Failed to restart container${NC}" >&2
+        return 1
+    fi
+}
+
+# Function to estimate model size from name
+estimate_model_size_gb() {
+    local model=$1
+    
+    # Extract parameter size from model name (e.g., "llama3.3:70b" -> 70)
+    if [[ $model =~ :([0-9]+)b ]]; then
+        local params="${BASH_REMATCH[1]}"
+        # Rough estimate: 0.6-0.7 GB per billion parameters for Q4 quantization
+        local size_gb=$(echo "$params * 0.65" | bc)
+        echo "${size_gb%.*}"  # Return integer
+    else
+        echo "0"
     fi
 }
 
@@ -210,6 +288,19 @@ for model in "${MODELS[@]}"; do
     echo -e "${GREEN}Testing: $model${NC}"
     echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
     
+    # Check memory usage before loading new model
+    mem_before=$(check_memory_usage)
+    if [ "$mem_before" != "0" ]; then
+        echo -e "${BLUE}Container memory before: ${mem_before}GiB${NC}"
+    fi
+    
+    # Estimate model size and decide if restart needed
+    estimated_size=$(estimate_model_size_gb "$model")
+    if [ "$RESTART_ON_LARGE_MODELS" = "true" ] && [ "$estimated_size" -gt 40 ]; then
+        echo -e "${YELLOW}Large model detected (~${estimated_size}GB). Restarting container to ensure clean state...${NC}"
+        restart_ollama_container
+    fi
+    
     # Check if model exists, pull if not
     if ! curl -s "$OLLAMA_HOST/api/tags" | jq -r '.models[].name' | grep -q "^$model$"; then
         echo -e "${YELLOW}Model not found locally. Pulling $model...${NC}"
@@ -219,6 +310,7 @@ for model in "${MODELS[@]}"; do
         
         if [ $? -ne 0 ]; then
             echo -e "${RED}Failed to pull $model. Skipping...${NC}"
+            echo ""
             continue
         fi
     else
@@ -232,8 +324,37 @@ for model in "${MODELS[@]}"; do
     
     # Warm up model (first request is always slower)
     echo -e "${YELLOW}Warming up model...${NC}"
-    curl -s "$OLLAMA_HOST/api/generate" -d "{\"model\": \"$model\", \"prompt\": \"Hi\", \"stream\": false}" > /dev/null
+    warmup_response=$(curl -s --max-time 60 "$OLLAMA_HOST/api/generate" \
+        -d "{\"model\": \"$model\", \"prompt\": \"Hi\", \"stream\": false}" 2>&1)
+    
+    if echo "$warmup_response" | grep -q "500 Internal Server Error\|EOF"; then
+        echo -e "${RED}✗ Failed to load model (memory issue or crash)${NC}"
+        echo -e "${RED}  Error: $warmup_response${NC}"
+        echo -e "${YELLOW}  Attempting container restart...${NC}"
+        
+        restart_ollama_container
+        
+        # Retry warmup after restart
+        echo -e "${YELLOW}  Retrying model load...${NC}"
+        warmup_response=$(curl -s --max-time 60 "$OLLAMA_HOST/api/generate" \
+            -d "{\"model\": \"$model\", \"prompt\": \"Hi\", \"stream\": false}" 2>&1)
+        
+        if echo "$warmup_response" | grep -q "500 Internal Server Error\|EOF"; then
+            echo -e "${RED}✗ Model still fails to load after restart. Skipping...${NC}"
+            echo -e "${RED}  This model may be too large for available memory.${NC}"
+            echo ""
+            continue
+        fi
+    fi
+    
     echo -e "${GREEN}✓ Model loaded${NC}"
+    
+    # Check memory usage after loading
+    mem_after=$(check_memory_usage)
+    if [ "$mem_after" != "0" ] && [ "$mem_before" != "0" ]; then
+        mem_delta=$(echo "$mem_after - $mem_before" | bc)
+        echo -e "${BLUE}Container memory after: ${mem_after}GiB (+${mem_delta}GiB)${NC}"
+    fi
     echo ""
     
     # Create file for this model's results
@@ -244,7 +365,9 @@ for model in "${MODELS[@]}"; do
         --arg model "$model" \
         --arg timestamp "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
         --argjson size "$model_size" \
-        '{model: $model, timestamp: $timestamp, model_size_bytes: $size, tests: []}' > "$model_file"
+        --arg mem_before "$mem_before" \
+        --arg mem_after "$mem_after" \
+        '{model: $model, timestamp: $timestamp, model_size_bytes: $size, memory_before_gib: $mem_before, memory_after_gib: $mem_after, tests: []}' > "$model_file"
     
     # Run tests for each prompt and collect results
     for prompt_name in "${!TEST_PROMPTS[@]}"; do
@@ -255,6 +378,17 @@ for model in "${MODELS[@]}"; do
         # Add result to model's tests array
         jq --argjson test "$result" '.tests += [$test]' "$model_file" > "$model_file.tmp" && mv "$model_file.tmp" "$model_file"
     done
+    
+    # Unload model to prevent memory buildup for next test
+    if [ "$UNLOAD_BETWEEN_MODELS" = "true" ]; then
+        unload_model "$model"
+        
+        # Check memory after unload
+        mem_unload=$(check_memory_usage)
+        if [ "$mem_unload" != "0" ]; then
+            echo -e "${BLUE}Container memory after unload: ${mem_unload}GiB${NC}"
+        fi
+    fi
     
     echo ""
 done
