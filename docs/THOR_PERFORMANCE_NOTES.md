@@ -13,6 +13,61 @@ This is the **Jetson-optimized** container from NVIDIA. Do NOT use standard `oll
 - Jetson container: 30-40 tok/s (gpt-oss:20b)
 - Standard container: 5-10 tok/s (same model)
 
+## GPU Monitoring with jtop
+
+### Installation
+
+Thor requires special patches for `jtop` (Jetson stats monitoring tool):
+
+```bash
+# On Thor
+cd /path/to/shadowhound
+sudo ./scripts/install_jtop_thor.sh
+```
+
+This script:
+- Installs jtop in a root-owned venv at `/opt/jtop`
+- Applies Thor-specific patches (tegra264, CUDA 13.0, module mappings)
+- Installs as systemd service for background monitoring
+- Provides `sudo jtop` command for interactive monitoring
+
+### Usage
+
+**Interactive monitoring:**
+```bash
+sudo jtop
+```
+
+Provides real-time:
+- GPU utilization %
+- GPU memory usage (MiB/GiB)
+- Power consumption (W)
+- Temperature (°C)
+- CPU/RAM stats
+
+**Service status:**
+```bash
+systemctl status jtop.service
+journalctl -u jtop --no-pager -e
+```
+
+### Why jtop?
+
+Standard `nvidia-smi` on Thor returns `N/A` for many metrics:
+- Memory usage: Not Supported
+- Power draw: N/A
+- Temperature: N/A
+
+`jtop` reads directly from Jetson hardware interfaces and provides accurate metrics.
+
+### For Benchmarking
+
+Run `sudo jtop` in another terminal while benchmarking to monitor:
+- Real-time GPU memory allocation per model
+- GPU utilization during inference
+- Power consumption patterns
+- Thermal throttling indicators
+
 ## Known Performance Issue: Model Unload Degradation
 
 ### Symptoms
