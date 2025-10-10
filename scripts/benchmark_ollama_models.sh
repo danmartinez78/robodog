@@ -160,27 +160,35 @@ format_bytes() {
     fi
 }
 
+# TODO: Memory monitoring disabled - nvidia-smi memory.used returns N/A on Jetson Thor
 # Function to check GPU memory usage (more accurate than container stats)
-check_memory_usage() {
-    # Try to get GPU memory usage first (where models actually live)
-    if command -v nvidia-smi &> /dev/null; then
-        local gpu_mem=$(nvidia-smi --query-gpu=memory.used --format=csv,noheader,nounits 2>/dev/null | head -1)
-        if [ -n "$gpu_mem" ] && [ "$gpu_mem" != "0" ]; then
-            # Convert MB to GB
-            local gpu_mem_gb=$(echo "scale=2; $gpu_mem / 1024" | bc)
-            echo "$gpu_mem_gb"
-            return
-        fi
-    fi
-    
-    # Fallback to container memory (less accurate for GPU workloads)
-    if command -v docker &> /dev/null; then
-        local mem_usage=$(docker stats ollama --no-stream --format "{{.MemUsage}}" 2>/dev/null | cut -d'/' -f1 | tr -d 'GiB' | tr -d ' ' || echo "0")
-        echo "$mem_usage"
-    else
-        echo "0"
-    fi
-}
+# check_memory_usage() {
+#     # Try to get GPU memory usage first (where models actually live)
+#     if command -v nvidia-smi &> /dev/null; then
+#         local gpu_mem=$(nvidia-smi --query-gpu=memory.used --format=csv,noheader,nounits 2>/dev/null | head -1 | tr -d ' ')
+#         # Check if we got a valid number (not empty, not N/A, not 0)
+#         if [ -n "$gpu_mem" ] && [ "$gpu_mem" != "N/A" ] && [ "$gpu_mem" != "[N/A]" ] && [[ "$gpu_mem" =~ ^[0-9]+$ ]] && [ "$gpu_mem" -gt 0 ]; then
+#             # Convert MB to GB
+#             local gpu_mem_gb=$(echo "scale=2; $gpu_mem / 1024" | bc 2>/dev/null)
+#             if [ -n "$gpu_mem_gb" ]; then
+#                 echo "$gpu_mem_gb"
+#                 return
+#             fi
+#         fi
+#     fi
+#     
+#     # Fallback to container memory (less accurate for GPU workloads)
+#     if command -v docker &> /dev/null; then
+#         local mem_usage=$(docker stats ollama --no-stream --format "{{.MemUsage}}" 2>/dev/null | cut -d'/' -f1 | tr -d 'GiBMiB' | tr -d ' ')
+#         if [ -n "$mem_usage" ] && [[ "$mem_usage" =~ ^[0-9.]+$ ]]; then
+#             echo "$mem_usage"
+#             return
+#         fi
+#     fi
+#     
+#     # If all else fails, return 0 (unknown)
+#     echo "0"
+# }
 
 # Function to unload a specific model from memory
 unload_model() {
@@ -220,11 +228,12 @@ unload_all_models() {
         echo -e "${YELLOW}  No models currently loaded${NC}" >&2
     fi
     
+    # TODO: Memory monitoring disabled - nvidia-smi returns N/A on Jetson Thor
     # Check memory freed
-    if command -v docker &> /dev/null && docker ps | grep -q ollama; then
-        local mem_after=$(check_memory_usage)
-        echo -e "${GREEN}  ✓ Memory usage: ${mem_after}GB${NC}" >&2
-    fi
+    # if command -v docker &> /dev/null && docker ps | grep -q ollama; then
+    #     local mem_after=$(check_memory_usage)
+    #     echo -e "${GREEN}  ✓ Memory usage: ${mem_after}GB${NC}" >&2
+    # fi
     
     return 0
 }
@@ -468,11 +477,12 @@ for model in "${MODELS[@]}"; do
     echo -e "${GREEN}Testing: $model${NC}"
     echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
     
+    # TODO: Memory monitoring disabled - nvidia-smi returns N/A on Jetson Thor
     # Check memory usage before loading new model
-    mem_before=$(check_memory_usage)
-    if [ "$mem_before" != "0" ]; then
-        echo -e "${BLUE}GPU memory before: ${mem_before}GB${NC}"
-    fi
+    # mem_before=$(check_memory_usage)
+    # if [ "$mem_before" != "0" ]; then
+    #     echo -e "${BLUE}GPU memory before: ${mem_before}GB${NC}"
+    # fi
     
     # Estimate model size and unload all models before large ones to prevent memory issues
     estimated_size=$(estimate_model_size_gb "$model")
@@ -542,25 +552,24 @@ for model in "${MODELS[@]}"; do
     
     echo -e "${GREEN}✓ Model loaded${NC}"
     
+    # TODO: Memory monitoring disabled - nvidia-smi returns N/A on Jetson Thor
     # Check memory usage after loading
-    mem_after=$(check_memory_usage)
-    if [ "$mem_after" != "0" ] && [ "$mem_before" != "0" ]; then
-        mem_delta=$(echo "$mem_after - $mem_before" | bc)
-        echo -e "${BLUE}GPU memory after: ${mem_after}GB (+${mem_delta}GB)${NC}"
-    fi
+    # mem_after=$(check_memory_usage)
+    # if [ "$mem_after" != "0" ] && [ "$mem_before" != "0" ]; then
+    #     mem_delta=$(echo "$mem_after - $mem_before" | bc)
+    #     echo -e "${BLUE}GPU memory after: ${mem_after}GB (+${mem_delta}GB)${NC}"
+    # fi
     echo ""
     
     # Create file for this model's results
     model_file="$TEMP_DIR/$(echo $model | tr ':/' '__').json"
     
-    # Write model metadata
+    # Write model metadata (memory monitoring disabled)
     jq -n \
         --arg model "$model" \
         --arg timestamp "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
         --argjson size "$model_size" \
-        --arg mem_before "$mem_before" \
-        --arg mem_after "$mem_after" \
-        '{model: $model, timestamp: $timestamp, model_size_bytes: $size, memory_before_gib: $mem_before, memory_after_gib: $mem_after, tests: []}' > "$model_file"
+        '{model: $model, timestamp: $timestamp, model_size_bytes: $size, tests: []}' > "$model_file"
     
     # Run tests for each prompt and collect results
     for prompt_name in "${!TEST_PROMPTS[@]}"; do
@@ -576,11 +585,12 @@ for model in "${MODELS[@]}"; do
     if [ "$UNLOAD_BETWEEN_MODELS" = "true" ]; then
         unload_model "$model"
         
+        # TODO: Memory monitoring disabled - nvidia-smi returns N/A on Jetson Thor
         # Check memory after unload
-        mem_unload=$(check_memory_usage)
-        if [ "$mem_unload" != "0" ]; then
-            echo -e "${BLUE}GPU memory after unload: ${mem_unload}GB${NC}"
-        fi
+        # mem_unload=$(check_memory_usage)
+        # if [ "$mem_unload" != "0" ]; then
+        #     echo -e "${BLUE}GPU memory after unload: ${mem_unload}GB${NC}"
+        # fi
     fi
     
     echo ""
