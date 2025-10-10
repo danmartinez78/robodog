@@ -421,9 +421,9 @@ for model in "${MODELS[@]}"; do
         echo -e "${BLUE}Container memory before: ${mem_before}GiB${NC}"
     fi
     
-    # Estimate model size and decide if restart needed
+    # Estimate model size and unload all models before large ones to prevent memory issues
     estimated_size=$(estimate_model_size_gb "$model")
-    if [ "$RESTART_ON_LARGE_MODELS" = "true" ] && [ "$estimated_size" -gt 40 ]; then
+    if [ "$CLEAR_BEFORE_LARGE_MODELS" = "true" ] && [ "$estimated_size" -gt 40 ]; then
         echo -e "${YELLOW}Large model detected (~${estimated_size}GB). Unloading all models to ensure clean state...${NC}"
         unload_all_models
     fi
@@ -433,13 +433,26 @@ for model in "${MODELS[@]}"; do
         echo -e "${YELLOW}Model not found locally. Pulling $model...${NC}"
         echo "This may take several minutes..."
         
-        docker exec ollama ollama pull "$model"
+        # Use Ollama API to pull model (streaming response)
+        curl -X POST "$OLLAMA_HOST/api/pull" \
+            -d "{\"name\": \"$model\"}" \
+            2>&1 | while IFS= read -r line; do
+                # Show progress if available
+                if echo "$line" | jq -e '.status' >/dev/null 2>&1; then
+                    status=$(echo "$line" | jq -r '.status')
+                    echo -ne "\r  $status                    "
+                fi
+            done
+        echo ""
         
-        if [ $? -ne 0 ]; then
+        # Verify model was pulled successfully
+        if ! curl -s "$OLLAMA_HOST/api/tags" | jq -r '.models[].name' | grep -q "^$model$"; then
             echo -e "${RED}Failed to pull $model. Skipping...${NC}"
             echo ""
             continue
         fi
+        
+        echo -e "${GREEN}✓ Model pulled successfully${NC}"
     else
         echo -e "${GREEN}✓ Model already available${NC}"
     fi
