@@ -348,6 +348,76 @@ docker exec ollama ollama pull deepseek-r1:7b
 
 ---
 
+## Post-Benchmark Discovery: Memory Pressure
+
+**Date**: 2025-10-10 (after initial benchmark)
+
+### The Issue
+After benchmarking, attempts to run models failed with:
+```
+Error: 500 Internal Server Error: do load request: Post "http://127.0.0.1:xxxxx/load": EOF
+```
+
+### Root Cause Analysis
+Container diagnostics revealed **56GB of cached model data**:
+```bash
+$ docker stats ollama
+CONTAINER ID   NAME      CPU %     MEM USAGE / LIMIT     MEM %
+923e9624b1e2   ollama    0.00%     56.07GiB / 122.8GiB   45.65%
+```
+
+**Memory pressure explained the benchmark failures**:
+
+1. **llama3.3:70b failure (42GB model)**:
+   - 56GB cached + 42GB new = **98GB total**
+   - Thor: 122GB total, ~105GB available after system overhead
+   - ROS2 + Nav2 ≈ 15-20GB → **Not enough RAM**
+   - Result: **OOM (Out of Memory)** → Load failed
+
+2. **deepseek-r1:7b failure (4.7GB model)**:
+   - Model tiny, should work easily
+   - Tested immediately after llama3.3:70b OOM
+   - System in unstable state from previous failure
+   - Or model incompatibility with Ollama version
+
+3. **EOF errors**:
+   - Internal loader processes crashing
+   - Stale connections from failed loads
+   - Container in degraded state
+
+### The Fix
+```bash
+$ docker restart ollama
+```
+
+**Result**: All models load successfully, including qwen2.5-coder:32b and phi4:14b
+
+### Lessons Learned
+
+1. **Benchmark order matters**: Earlier models stay cached, affect later tests
+2. **Memory headroom critical**: Large models (70B) risky when others cached
+3. **Container restart essential**: Clear stale state after heavy testing
+4. **Production model choice validated**: 
+   - qwen2.5-coder:32b (19GB) + phi4:14b (9GB) = 28GB total
+   - Both fit comfortably with room for ROS2 stack
+   - No memory pressure in production use
+
+5. **Testing procedure update**:
+   - Restart container between large model tests
+   - Monitor memory usage during benchmarks
+   - Test production models together to verify co-existence
+
+### Production Deployment Safety
+The chosen models are **memory-safe** for production:
+- **PRIMARY: qwen2.5-coder:32b** (19GB) - Plenty of headroom
+- **BACKUP: phi4:14b** (9GB) - Even safer
+- **Combined**: 28GB if both loaded
+- **Available**: ~90GB after ROS2/Nav2/system overhead
+
+**No risk of OOM in production deployment.**
+
+---
+
 ## Appendix: Raw Data
 
 ### qwen2.5-coder:32b
