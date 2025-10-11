@@ -105,14 +105,14 @@ class MissionAgentNode(Node):
         # Initialize mission executor
         self.get_logger().info("Initializing MissionExecutor...")
         self.mission_executor.initialize()
-        
+
         # Validate LLM backend connection on startup
         if not self._validate_llm_backend():
             raise RuntimeError(
                 "LLM backend validation failed. Check logs above for details. "
                 "Ensure the backend service is running and accessible."
             )
-        
+
         self.get_logger().info("MissionExecutor ready!")
 
         # Initialize web interface (optional)
@@ -223,58 +223,53 @@ class MissionAgentNode(Node):
 
     def _validate_llm_backend(self) -> bool:
         """Validate LLM backend connection on startup.
-        
+
         This sends a simple test prompt to the configured backend to ensure it's
         reachable and responding before accepting mission commands. This catches
         configuration errors early rather than failing on first mission.
-        
+
         Returns:
             bool: True if validation passed, False otherwise
         """
         self.get_logger().info("=" * 60)
         self.get_logger().info("🔍 VALIDATING LLM BACKEND CONNECTION")
         self.get_logger().info("=" * 60)
-        
+
         agent_backend = self.get_parameter("agent_backend").value
         self.get_logger().info(f"Testing {agent_backend} backend...")
-        
+
         try:
             if agent_backend == "ollama":
                 return self._validate_ollama_backend()
             elif agent_backend == "openai":
                 return self._validate_openai_backend()
             else:
-                self.get_logger().error(
-                    f"❌ Unknown backend: {agent_backend}"
-                )
+                self.get_logger().error(f"❌ Unknown backend: {agent_backend}")
                 return False
-                
+
         except Exception as e:
             self.get_logger().error(f"❌ Backend validation failed with exception: {e}")
             return False
-    
+
     def _validate_ollama_backend(self) -> bool:
         """Validate Ollama backend connection.
-        
+
         Returns:
             bool: True if Ollama is accessible and responding
         """
         import requests
-        
+
         ollama_base_url = self.get_parameter("ollama_base_url").value
         ollama_model = self.get_parameter("ollama_model").value
-        
+
         self.get_logger().info(f"  URL: {ollama_base_url}")
         self.get_logger().info(f"  Model: {ollama_model}")
-        
+
         # Step 1: Check if Ollama service is responding
         try:
             self.get_logger().info("  Checking Ollama service...")
-            response = requests.get(
-                f"{ollama_base_url}/api/tags",
-                timeout=5
-            )
-            
+            response = requests.get(f"{ollama_base_url}/api/tags", timeout=5)
+
             if response.status_code != 200:
                 self.get_logger().error(
                     f"❌ Ollama service returned status {response.status_code}"
@@ -283,67 +278,71 @@ class MissionAgentNode(Node):
                     f"   Check that Ollama is running at {ollama_base_url}"
                 )
                 return False
-            
+
             self.get_logger().info("  ✅ Ollama service responding")
-            
+
         except requests.exceptions.Timeout:
             self.get_logger().error(
                 f"❌ Timeout connecting to Ollama at {ollama_base_url}"
             )
             self.get_logger().error("   Check network connectivity and Ollama status")
             return False
-            
+
         except requests.exceptions.ConnectionError as e:
-            self.get_logger().error(
-                f"❌ Cannot connect to Ollama at {ollama_base_url}"
-            )
+            self.get_logger().error(f"❌ Cannot connect to Ollama at {ollama_base_url}")
             self.get_logger().error(f"   Error: {e}")
-            self.get_logger().error("   Check that Ollama is running and URL is correct")
+            self.get_logger().error(
+                "   Check that Ollama is running and URL is correct"
+            )
             return False
-        
+
         # Step 2: Check if model is available
         try:
             models_data = response.json()
-            available_models = [m.get('name', '') for m in models_data.get('models', [])]
-            
+            available_models = [
+                m.get("name", "") for m in models_data.get("models", [])
+            ]
+
             if ollama_model not in available_models:
                 self.get_logger().error(
                     f"❌ Model '{ollama_model}' not found in Ollama"
                 )
-                self.get_logger().error(f"   Available models: {', '.join(available_models)}")
-                self.get_logger().error(f"   Pull the model with: ollama pull {ollama_model}")
+                self.get_logger().error(
+                    f"   Available models: {', '.join(available_models)}"
+                )
+                self.get_logger().error(
+                    f"   Pull the model with: ollama pull {ollama_model}"
+                )
                 return False
-            
+
             self.get_logger().info(f"  ✅ Model '{ollama_model}' available")
-            
+
         except Exception as e:
             self.get_logger().error(f"❌ Failed to parse Ollama models list: {e}")
             return False
-        
+
         # Step 3: Send a test prompt
         try:
             self.get_logger().info("  Sending test prompt...")
             test_response = requests.post(
                 f"{ollama_base_url}/api/generate",
-                json={
-                    "model": ollama_model,
-                    "prompt": "Say OK",
-                    "stream": False
-                },
-                timeout=30
+                json={"model": ollama_model, "prompt": "Say OK", "stream": False},
+                timeout=30,
             )
-            
+
             if test_response.status_code != 200:
                 self.get_logger().error(
                     f"❌ Test prompt failed with status {test_response.status_code}"
                 )
                 return False
-            
+
             response_data = test_response.json()
-            response_text = response_data.get('response', '').strip()
-            
-            self.get_logger().info(f"  ✅ Test prompt succeeded (response: '{response_text}')")
-            
+            response_text = response_data.get("response", "").strip()
+
+            self.get_logger().info(
+                f"  ✅ Test prompt succeeded (response: '{response_text}')"
+            )
+
         except requests.exceptions.Timeout:
             self.get_logger().error(
                 f"❌ Timeout waiting for test prompt response (>30s)"
@@ -352,62 +351,66 @@ class MissionAgentNode(Node):
                 f"   Model '{ollama_model}' may be too slow or not loaded"
             )
             return False
-            
+
         except Exception as e:
             self.get_logger().error(f"❌ Test prompt failed: {e}")
             return False
-        
+
         # All checks passed
         self.get_logger().info("=" * 60)
         self.get_logger().info("✅ Ollama backend validation PASSED")
         self.get_logger().info("=" * 60)
         return True
-    
+
     def _validate_openai_backend(self) -> bool:
         """Validate OpenAI backend connection.
-        
+
         Returns:
             bool: True if OpenAI API is accessible
         """
         import os
         from openai import OpenAI
-        
+
         # Check API key
         api_key = os.getenv("OPENAI_API_KEY")
         if not api_key:
             self.get_logger().error("❌ OPENAI_API_KEY environment variable not set")
             self.get_logger().error("   Set it with: export OPENAI_API_KEY='sk-...'")
             return False
-        
+
         self.get_logger().info("  ✅ OPENAI_API_KEY found")
-        
+
         openai_base_url = self.get_parameter("openai_base_url").value
         openai_model = self.get_parameter("openai_model").value
-        
+
         self.get_logger().info(f"  Base URL: {openai_base_url}")
         self.get_logger().info(f"  Model: {openai_model}")
-        
+
         # Send test prompt
         try:
             self.get_logger().info("  Sending test prompt...")
-            
+
             client = OpenAI(base_url=openai_base_url, api_key=api_key)
-            
+
             response = client.chat.completions.create(
                 model=openai_model,
                 messages=[{"role": "user", "content": "Say OK"}],
                 max_tokens=10,
-                timeout=30
+                timeout=30,
             )
-            
+
             response_text = response.choices[0].message.content.strip()
-            self.get_logger().info(f"  ✅ Test prompt succeeded (response: '{response_text}')")
-            
+            self.get_logger().info(
+                f"  ✅ Test prompt succeeded (response: '{response_text}')"
+            )
+
         except Exception as e:
             self.get_logger().error(f"❌ OpenAI test prompt failed: {e}")
-            self.get_logger().error("   Check API key, model name, and network connectivity")
+            self.get_logger().error(
+                "   Check API key, model name, and network connectivity"
+            )
             return False
-        
+
         # All checks passed
         self.get_logger().info("=" * 60)
         self.get_logger().info("✅ OpenAI backend validation PASSED")
